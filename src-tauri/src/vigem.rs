@@ -15,7 +15,7 @@ pub struct XInputTarget {
 impl XInputTarget {
     pub fn connect() -> Result<Self> {
         let client = Client::connect()?;
-        let mut target = Xbox360Wired::new(client.clone(), TargetId::XBOX360_WIRED);
+        let mut target = Xbox360Wired::new(client.try_clone()?, TargetId::XBOX360_WIRED);
         target.plugin()?;
         target.wait_ready()?;
         Ok(Self {

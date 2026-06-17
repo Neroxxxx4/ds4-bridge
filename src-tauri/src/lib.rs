@@ -9,7 +9,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_notification::NotificationExt;
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_opener::OpenerExt;
 use hidapi::HidApi;
 use ds4::{Ds4Device, Ds4State};
 use vigem::{XInputTarget, battery_to_rgb};
@@ -66,8 +66,8 @@ fn set_battery_color(state: State<'_, Arc<AppState>>, enable: bool) {
 
 #[tauri::command]
 fn open_vigem_download(app: AppHandle) -> Result<(), String> {
-    app.shell()
-        .open("https://github.com/nefarius/ViGEmBus/releases/latest", None)
+    app.opener()
+        .open_url("https://github.com/nefarius/ViGEmBus/releases/latest", None::<&str>)
         .map_err(|e| e.to_string())
 }
 
@@ -211,7 +211,7 @@ pub fn run() {
     *state.lightbar.lock() = (0, 0, 255); // default: PS blue
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent, None,
         ))
