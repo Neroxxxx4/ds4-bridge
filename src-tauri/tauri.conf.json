@@ -35,12 +35,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": ["nsis"],
     "publisher": "DS4 Bridge",
-    "copyright": "© 2024 DS4 Bridge",
-    "category": "Utility",
-    "shortDescription": "Use your PS4 controller on Xbox PC games",
-    "longDescription": "DS4 Bridge lets you use a PlayStation 4 DualShock controller on any Windows game that supports Xbox controllers. Features live battery monitoring, lightbar color control, and a fix for the microphone/speaker bug.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -49,32 +45,14 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "digestAlgorithm": "sha256",
-      "certificateThumbprint": null,
-      "timestampUrl": "",
-      "tsp": false,
-      "webviewInstallMode": {
-        "type": "downloadBootstrapper"
-      },
       "nsis": {
-        "template": null,
-        "license": null,
-        "headerImage": null,
-        "sidebarImage": null,
-        "installerIcon": null,
-        "uninstallerIcon": null,
-        "uninstallDisplayName": "DS4 Bridge",
         "installMode": "perMachine",
         "languages": ["English"],
         "displayLanguageSelector": false,
         "shortcutName": "DS4 Bridge",
         "createDesktopShortcut": "always",
         "createStartMenuShortcut": true,
-        "startMenuFolder": "DS4 Bridge",
-        "enableDefaultSectionDisplay": false,
-        "allowDowngrades": true,
-        "compression": "lzma",
-        "minimumWebview2Version": "2.0.0"
+        "uninstallDisplayName": "DS4 Bridge"
       }
     }
   }
