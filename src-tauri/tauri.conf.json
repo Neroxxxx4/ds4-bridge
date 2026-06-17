@@ -1,0 +1,81 @@
+{
+  "productName": "DS4 Bridge",
+  "version": "0.1.0",
+  "identifier": "com.ds4bridge.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DS4 Bridge",
+        "width": 900,
+        "height": 620,
+        "minWidth": 760,
+        "minHeight": 520,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "DS4 Bridge",
+    "copyright": "© 2024 DS4 Bridge",
+    "category": "Utility",
+    "shortDescription": "Use your PS4 controller on Xbox PC games",
+    "longDescription": "DS4 Bridge lets you use a PlayStation 4 DualShock controller on any Windows game that supports Xbox controllers. Features live battery monitoring, lightbar color control, and a fix for the microphone/speaker bug.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "certificateThumbprint": null,
+      "timestampUrl": "",
+      "tsp": false,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "template": null,
+        "license": null,
+        "headerImage": null,
+        "sidebarImage": null,
+        "installerIcon": null,
+        "uninstallerIcon": null,
+        "uninstallDisplayName": "DS4 Bridge",
+        "installMode": "perMachine",
+        "languages": ["English"],
+        "displayLanguageSelector": false,
+        "shortcutName": "DS4 Bridge",
+        "createDesktopShortcut": "always",
+        "createStartMenuShortcut": true,
+        "startMenuFolder": "DS4 Bridge",
+        "enableDefaultSectionDisplay": false,
+        "allowDowngrades": true,
+        "compression": "lzma",
+        "minimumWebview2Version": "2.0.0"
+      }
+    }
+  }
+}

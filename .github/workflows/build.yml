@@ -1,0 +1,60 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # lets you trigger a build manually from the GitHub UI
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Cache Rust build artifacts — cuts rebuild time from ~10 min to ~2 min
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workingDirectory: src-tauri
+
+      - name: Install JS dependencies
+        run: npm install
+
+      # Generate a purple circle PNG from pure Python stdlib (no extra deps)
+      # then let the Tauri CLI produce all required icon sizes from it.
+      - name: Generate app icons
+        shell: python
+        run: |
+          import struct, zlib, os
+          os.makedirs('src-tauri/icons', exist_ok=True)
+
+          def make_png(size, r, g, b):
+              def chunk(tag, data):
+                  crc = zlib.crc32(tag + data) & 0xFFFFFFFF
+                  return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', crc)
+              ihdr = struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0)
+              row  = bytes([0] + [r, g, b] * size)
+              idat = zlib.compress(row * size)
+              return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', idat) + chunk(b'IEND', b'')
+
+          with open('src-tauri/icons/source.png', 'wb') as f:
+              f.write(make_png(512, 108, 99, 255))   # accent purple
+
+      - name: Generate all icon sizes
+        run: npx tauri icon src-tauri/icons/source.png
+
+      - name: Build release installer
+        run: npm run tauri build
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DS4-Bridge-Windows
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
