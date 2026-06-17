@@ -55,6 +55,10 @@ CI builds run on GitHub Actions (`windows-latest`) on every push to `main`. Grab
 
 DS4Windows is great but heavy — it's a full .NET app with a lot of features most people never use. DS4 Bridge does the one thing: **make your PS4 controller work in Xbox games**, with a clean UI and a tiny footprint.
 
+## Vibe coded
+
+I'm not a developer — this was entirely vibe coded with [Claude Code](https://claude.ai/code). If something breaks, open an issue and I'll ask the AI to fix it.
+
 ## License
 
 MIT
