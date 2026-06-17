@@ -44,16 +44,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "windows": {
-      "nsis": {
-        "installMode": "perMachine",
-        "languages": ["English"],
-        "displayLanguageSelector": false,
-        "shortcutName": "DS4 Bridge",
-        "createDesktopShortcut": "always",
-        "createStartMenuShortcut": true,
-        "uninstallDisplayName": "DS4 Bridge"
-      }
-    }
+    "windows": {}
   }
 }
