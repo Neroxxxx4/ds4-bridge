@@ -15,6 +15,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 hidapi = { version = "2.6", default-features = false, features = ["windows-native"] }
 vigem-client = "0.1"

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -168,6 +169,9 @@ export default function App() {
   const [audioFix, setAudioFix] = useState(false);
   const [audioStatus, setAudioStatus] = useState<"idle" | "working" | "done" | "error">("idle");
   const colorDebounce = useRef<ReturnType<typeof setTimeout>>();
+  const pendingUpdate = useRef<Update | null>(null);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     invoke<boolean>("get_vigem_status").then(setVigem);
@@ -179,6 +183,9 @@ export default function App() {
       if (e.payload === "launched") setVigemInstall("launched");
     });
     invoke<Ds4State>("get_controller_state").then(setCtrl);
+    check().then(u => {
+      if (u?.available) { pendingUpdate.current = u; setUpdateVersion(u.version); }
+    }).catch(() => {});
     return () => {
       unlisten.then((fn) => fn());
       unlistenVigem.then((fn) => fn());
@@ -235,6 +242,13 @@ export default function App() {
     }
   }, [audioFix]);
 
+  const doUpdate = useCallback(async () => {
+    if (!pendingUpdate.current) return;
+    setUpdating(true);
+    try { await pendingUpdate.current.downloadAndInstall(); }
+    catch { setUpdating(false); }
+  }, []);
+
   const b = ctrl.buttons;
 
   return (
@@ -265,6 +279,22 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Update banner */}
+      {updateVersion && (
+        <div className="flex items-center justify-between px-4 py-1.5 bg-accent/15 border-b border-accent/25 flex-shrink-0">
+          <span className="text-xs text-zinc-300">
+            Update available — <span className="text-accent font-semibold">v{updateVersion}</span>
+          </span>
+          <button
+            onClick={doUpdate}
+            disabled={updating}
+            className="no-drag text-xs px-3 py-1 rounded-lg bg-accent hover:bg-accent-dim text-white font-semibold transition-colors disabled:opacity-60"
+          >
+            {updating ? "Downloading…" : "Update & Restart"}
+          </button>
+        </div>
+      )}
 
       {/* ViGEmBus first-run setup wizard */}
       {vigem === false && (

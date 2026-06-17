@@ -1,27 +1,28 @@
-name: Build Windows Installer
+name: Build / Release
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:        # lets you trigger a build manually from the GitHub UI
+  workflow_dispatch:        # run manually from GitHub UI to create a release
 
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write       # needed to create GitHub Releases
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Cache Rust build artifacts — cuts rebuild time from ~10 min to ~2 min
       - uses: Swatinem/rust-cache@v2
         with:
-          workingDirectory: src-tauri
+          workspaces: src-tauri -> target
 
       - name: Install JS dependencies
         run: npm install
@@ -44,60 +45,33 @@ jobs:
           GRIP = (22, 22, 36, 255)
           ACC  = (108, 99, 255, 255)
           DIM  = (50, 48, 80, 255)
-          W    = (220, 215, 255, 255)
 
-          # Background circle
           d.ellipse([0, 0, S, S], fill=BG)
-
-          # Controller body (wide horizontal pill)
           d.rounded_rectangle([72, 148, 440, 316], radius=60, fill=BODY)
-
-          # Left grip
           d.rounded_rectangle([80, 270, 200, 400], radius=36, fill=GRIP)
-          # Right grip
           d.rounded_rectangle([312, 270, 432, 400], radius=36, fill=GRIP)
-
-          # Lightbar (thin strip at top of body)
           d.rounded_rectangle([190, 155, 322, 167], radius=6, fill=ACC)
 
-          # --- Left side: D-pad ---
-          cx, cy = 174, 232
-          arm = 22
-          th  = 15
-          # horizontal arm
-          d.rounded_rectangle([cx - arm, cy - th//2, cx + arm, cy + th//2], radius=4, fill=DIM)
-          # vertical arm
-          d.rounded_rectangle([cx - th//2, cy - arm, cx + th//2, cy + arm], radius=4, fill=DIM)
+          cx, cy, arm, th = 174, 232, 22, 15
+          d.rounded_rectangle([cx-arm, cy-th//2, cx+arm, cy+th//2], radius=4, fill=DIM)
+          d.rounded_rectangle([cx-th//2, cy-arm, cx+th//2, cy+arm], radius=4, fill=DIM)
 
-          # Left stick (below d-pad)
           d.ellipse([116, 296, 196, 376], fill=DIM)
           d.ellipse([136, 316, 176, 356], fill=ACC)
 
-          # --- Right side: Face buttons ---
-          bx, by = 338, 232
-          r = 16
-          face = [
-              ((bx,      by - 28), (64,  200, 80,  220)),   # up    = Triangle (green)
-              ((bx + 28, by     ), (220, 80,  80,  220)),   # right = Circle   (red)
-              ((bx,      by + 28), (100, 140, 220, 220)),   # down  = Cross    (blue)
-              ((bx - 28, by     ), (200, 80,  200, 220)),   # left  = Square   (pink)
-          ]
-          for (fx, fy), col in face:
-              d.ellipse([fx - r, fy - r, fx + r, fy + r], fill=col)
+          bx, by, r = 338, 232, 16
+          for (ox, oy), col in [
+            ((0, -28), (64,200,80,220)), ((28,0), (220,80,80,220)),
+            ((0,  28), (100,140,220,220)), ((-28,0), (200,80,200,220)),
+          ]:
+            d.ellipse([bx+ox-r, by+oy-r, bx+ox+r, by+oy+r], fill=col)
 
-          # Right stick (right of face buttons)
           d.ellipse([316, 296, 396, 376], fill=DIM)
           d.ellipse([336, 316, 376, 356], fill=ACC)
-
-          # Share / Options small buttons
           d.ellipse([218, 212, 238, 228], fill=DIM)
           d.ellipse([274, 212, 294, 228], fill=DIM)
-
-          # PS logo button (center)
           d.ellipse([238, 246, 274, 282], fill=DIM)
           d.ellipse([248, 256, 264, 272], fill=ACC)
-
-          # Touchpad (center rectangle)
           d.rounded_rectangle([208, 168, 304, 210], radius=8, fill=DIM)
 
           os.makedirs('src-tauri/icons', exist_ok=True)
@@ -106,12 +80,88 @@ jobs:
       - name: Generate all icon sizes
         run: npx tauri icon src-tauri/icons/source.png
 
+      - name: Read version from tauri.conf.json
+        id: version
+        shell: python
+        run: |
+          import json, os
+          with open('src-tauri/tauri.conf.json') as f:
+            v = json.load(f)['version']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f'value={v}\n')
+
       - name: Build release installer
         run: npm run tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Upload installer artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: DS4-Bridge-Windows
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+      # ── Release steps — only run on manual workflow_dispatch ─────────────────
+
+      - name: Generate latest.json
+        if: github.event_name == 'workflow_dispatch'
+        shell: python
+        run: |
+          import json, os, glob
+          from datetime import datetime, timezone
+
+          version = os.environ['APP_VERSION']
+          bundle  = 'src-tauri/target/release/bundle/nsis'
+
+          # prefer .nsis.zip for smaller update downloads, fall back to .exe
+          zip_sigs = glob.glob(f'{bundle}/*.nsis.zip.sig')
+          exe_sigs = glob.glob(f'{bundle}/*.exe.sig')
+
+          if zip_sigs:
+            sig_file   = zip_sigs[0]
+            asset_file = sig_file[:-4]          # strip .sig
+          elif exe_sigs:
+            sig_file   = exe_sigs[0]
+            asset_file = sig_file[:-4]
+          else:
+            raise FileNotFoundError('No .sig file found — is TAURI_SIGNING_PRIVATE_KEY set?')
+
+          sig        = open(sig_file).read().strip()
+          asset_name = os.path.basename(asset_file)
+
+          manifest = {
+            "version": version,
+            "notes":   f"DS4 Bridge v{version}",
+            "pub_date": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "platforms": {
+              "windows-x86_64": {
+                "signature": sig,
+                "url": f"https://github.com/Neroxxxx4/ds4-bridge/releases/download/v{version}/{asset_name}"
+              }
+            }
+          }
+
+          with open('latest.json', 'w') as f:
+            json.dump(manifest, f, indent=2)
+
+          print(f'latest.json → {asset_name}')
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          name: DS4 Bridge v${{ steps.version.outputs.value }}
+          body: |
+            Download `*_x64-setup.exe` below and run it to install.
+            If you already have the app, it will prompt you to update automatically.
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.nsis.zip
+            src-tauri/target/release/bundle/nsis/*.sig
+            latest.json
+          make_latest: true
