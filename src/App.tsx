@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,18 @@ function BtnDot({ active, color, label }: { active: boolean; color: string; labe
     >
       {label}
     </div>
+  );
+}
+
+function WinBtn({ onClick, title, danger, children }: { onClick: () => void; title: string; danger?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`no-drag w-7 h-7 rounded flex items-center justify-center transition-colors duration-150 text-zinc-500 ${danger ? "hover:bg-red-500/80 hover:text-white" : "hover:bg-surface-3 hover:text-zinc-200"}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -237,7 +250,20 @@ export default function App() {
             </span>
           )}
         </div>
-        <Battery level={ctrl.battery} charging={ctrl.charging} connected={ctrl.connected} />
+        <div className="flex items-center gap-1">
+          <Battery level={ctrl.battery} charging={ctrl.charging} connected={ctrl.connected} />
+          <div className="flex items-center gap-0.5 ml-3">
+            <WinBtn title="Minimize" onClick={() => getCurrentWindow().minimize()}>
+              <svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="8" x2="9" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </WinBtn>
+            <WinBtn title="Maximize" onClick={() => getCurrentWindow().toggleMaximize()}>
+              <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
+            </WinBtn>
+            <WinBtn title="Close to tray" onClick={() => getCurrentWindow().hide()} danger>
+              <svg width="10" height="10" viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="8" y1="2" x2="2" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </WinBtn>
+          </div>
+        </div>
       </div>
 
       {/* ViGEmBus first-run setup wizard */}
