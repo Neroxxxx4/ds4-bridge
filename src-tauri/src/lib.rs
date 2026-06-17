@@ -232,10 +232,11 @@ pub fn run() {
         .setup(move |app| {
             setup_tray(app)?;
             let window = app.get_webview_window("main").unwrap();
+            let w = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    window.hide().ok();
+                    w.hide().ok();
                 }
             });
             let handle = app.handle().clone();
