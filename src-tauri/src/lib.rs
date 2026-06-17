@@ -4,7 +4,7 @@ mod audio;
 
 use std::sync::Arc;
 use parking_lot::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_autostart::ManagerExt;
