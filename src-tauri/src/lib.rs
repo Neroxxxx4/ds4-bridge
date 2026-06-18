@@ -19,6 +19,7 @@ pub struct AppState {
     controller_state: Mutex<Ds4State>,
     lightbar:         Mutex<(u8, u8, u8)>,
     battery_color:    Mutex<bool>,
+    deadzone:         Mutex<f32>,
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
@@ -77,6 +78,16 @@ fn get_battery_color(state: State<'_, Arc<AppState>>) -> bool {
 #[tauri::command]
 fn set_battery_color(state: State<'_, Arc<AppState>>, enable: bool) {
     *state.battery_color.lock() = enable;
+}
+
+#[tauri::command]
+fn get_deadzone(state: State<'_, Arc<AppState>>) -> f32 {
+    *state.deadzone.lock()
+}
+
+#[tauri::command]
+fn set_deadzone(state: State<'_, Arc<AppState>>, value: f32) {
+    *state.deadzone.lock() = value.clamp(0.0, 0.4);
 }
 
 #[tauri::command]
@@ -202,8 +213,9 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
                 last_battery = s.battery;
 
                 // Update XInput virtual pad
+                let deadzone = *state.deadzone.lock();
                 if let Some(x) = xinput.as_mut() {
-                    if let Err(e) = x.update(&s) {
+                    if let Err(e) = x.update(&s, deadzone) {
                         log::warn!("ViGEm update: {e}");
                         xinput = None;
                     }
@@ -259,6 +271,8 @@ pub fn run() {
             minimize_window,
             toggle_maximize_window,
             hide_window,
+            get_deadzone,
+            set_deadzone,
         ])
         .setup(move |app| {
             setup_tray(app)?;

@@ -102,20 +102,37 @@ impl Ds4Device {
             }
             ConnectionType::Bluetooth => {
                 let mut report = [0u8; 78];
-                report[0] = 0x15;
-                report[1] = 0xC0;
-                report[2] = 0x20;
-                report[4] = 0xFF;
-                report[5] = rumble_small;
-                report[6] = rumble_large;
-                report[7] = r;
-                report[8] = g;
-                report[9] = b;
+                report[0] = 0x11; // BT output report ID
+                report[1] = 0x80; // no audio path
+                report[2] = 0xFF; // enable rumble + lightbar
+                report[4] = rumble_small;
+                report[5] = rumble_large;
+                report[6] = r;
+                report[7] = g;
+                report[8] = b;
+                // CRC32 required by DS4 v2 firmware over BT
+                let crc = bt_crc32(&report[..74]);
+                report[74] = (crc & 0xFF) as u8;
+                report[75] = ((crc >> 8) & 0xFF) as u8;
+                report[76] = ((crc >> 16) & 0xFF) as u8;
+                report[77] = ((crc >> 24) & 0xFF) as u8;
                 self.device.write(&report)?;
             }
         }
         Ok(())
     }
+}
+
+// CRC32 with 0xA2 seed byte prepended (DS4 BT protocol requirement)
+fn bt_crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFFFFFF;
+    for &byte in std::iter::once(&0xA2u8).chain(data.iter()) {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB88320 } else { crc >> 1 };
+        }
+    }
+    !crc
 }
 
 fn parse_report(data: &[u8], conn: ConnectionType) -> Ds4State {

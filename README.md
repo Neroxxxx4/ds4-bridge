@@ -1,8 +1,18 @@
 # DS4 Bridge
 
+[![Build](https://github.com/Neroxxxx4/ds4-bridge/actions/workflows/build.yml/badge.svg)](https://github.com/Neroxxxx4/ds4-bridge/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/release/Neroxxxx4/ds4-bridge?color=6c63ff)](https://github.com/Neroxxxx4/ds4-bridge/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A lightweight Windows app for using a PS4 (DualShock 4) controller in Xbox/XInput games — without DS4Windows or any heavyweight background services.
 
 Built with [Tauri 2](https://tauri.app) (Rust + React). Ships as a single `.exe` installer.
+
+---
+
+## Screenshot
+
+![DS4 Bridge UI](docs/screenshot.png)
 
 ---
 

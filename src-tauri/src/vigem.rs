@@ -25,13 +25,21 @@ impl XInputTarget {
         })
     }
 
-    pub fn update(&mut self, state: &Ds4State) -> Result<()> {
-        self.target.update(&ds4_to_xgamepad(state))?;
+    pub fn update(&mut self, state: &Ds4State, deadzone: f32) -> Result<()> {
+        self.target.update(&ds4_to_xgamepad(state, deadzone))?;
         Ok(())
     }
 }
 
-fn ds4_to_xgamepad(s: &Ds4State) -> XGamepad {
+fn apply_deadzone(v: u8, deadzone: f32) -> i16 {
+    let raw = (v as f32 - 128.0) / 128.0;
+    if raw.abs() < deadzone { return 0; }
+    let sign = raw.signum();
+    let scaled = (raw.abs() - deadzone) / (1.0 - deadzone);
+    (sign * scaled * 32767.0) as i16
+}
+
+fn ds4_to_xgamepad(s: &Ds4State, deadzone: f32) -> XGamepad {
     let b = s.buttons;
     let mut bits: u16 = 0;
 
@@ -56,15 +64,11 @@ fn ds4_to_xgamepad(s: &Ds4State) -> XGamepad {
         buttons:       XButtons(bits),
         left_trigger:  s.l2,
         right_trigger: s.r2,
-        thumb_lx:      u8_to_axis(s.lx),
-        thumb_ly:     -u8_to_axis(s.ly),
-        thumb_rx:      u8_to_axis(s.rx),
-        thumb_ry:     -u8_to_axis(s.ry),
+        thumb_lx:      apply_deadzone(s.lx,  deadzone),
+        thumb_ly:     -apply_deadzone(s.ly,  deadzone),
+        thumb_rx:      apply_deadzone(s.rx,  deadzone),
+        thumb_ry:     -apply_deadzone(s.ry,  deadzone),
     }
-}
-
-fn u8_to_axis(v: u8) -> i16 {
-    ((v as i32 - 128) * 32767 / 127) as i16
 }
 
 pub fn battery_to_rgb(level: u8) -> (u8, u8, u8) {

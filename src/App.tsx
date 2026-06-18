@@ -173,11 +173,14 @@ export default function App() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [deadzone, setDeadzone] = useState(0);
+  const deadzoneDebounce = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     invoke<boolean>("get_vigem_status").then(setVigem);
     invoke<boolean>("get_autostart").then(setAutostart);
     invoke<boolean>("get_battery_color").then(setBatteryColor);
+    invoke<number>("get_deadzone").then(v => setDeadzone(Math.round(v * 100)));
     const unlisten = listen<Ds4State>("controller-update", (e) => setCtrl(e.payload));
     const unlistenVigem = listen<string>("vigem-install", (e) => {
       if (e.payload === "downloading") setVigemInstall("downloading");
@@ -535,6 +538,25 @@ export default function App() {
               vigem && ctrl.connected ? "bg-green-400" :
               vigem ? "bg-amber-400" : "bg-red-500"
             }`} />
+          </div>
+
+          {/* Stick deadzone */}
+          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-300">Stick Deadzone</span>
+              <span className="text-xs font-semibold tabular-nums text-accent">{deadzone}%</span>
+            </div>
+            <input
+              type="range" min={0} max={40} value={deadzone}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setDeadzone(v);
+                clearTimeout(deadzoneDebounce.current);
+                deadzoneDebounce.current = setTimeout(() => invoke("set_deadzone", { value: v / 100 }), 80);
+              }}
+              className="no-drag w-full accent-accent h-1.5 cursor-pointer"
+            />
+            <p className="text-[10px] text-zinc-600">Ignore stick input below this threshold. Helps with drift.</p>
           </div>
 
           {/* Info */}
