@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ export default function App() {
   const pendingUpdate = useRef<Update | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     invoke<boolean>("get_vigem_status").then(setVigem);
@@ -245,8 +247,14 @@ export default function App() {
   const doUpdate = useCallback(async () => {
     if (!pendingUpdate.current) return;
     setUpdating(true);
-    try { await pendingUpdate.current.downloadAndInstall(); }
-    catch { setUpdating(false); }
+    setUpdateError(null);
+    try {
+      await pendingUpdate.current.downloadAndInstall();
+      await relaunch();
+    } catch (e) {
+      setUpdateError(String(e));
+      setUpdating(false);
+    }
   }, []);
 
   const b = ctrl.buttons;
@@ -282,17 +290,22 @@ export default function App() {
 
       {/* Update banner */}
       {updateVersion && (
-        <div className="flex items-center justify-between px-4 py-1.5 bg-accent/15 border-b border-accent/25 flex-shrink-0">
-          <span className="text-xs text-zinc-300">
-            Update available — <span className="text-accent font-semibold">v{updateVersion}</span>
-          </span>
-          <button
-            onClick={doUpdate}
-            disabled={updating}
-            className="no-drag text-xs px-3 py-1 rounded-lg bg-accent hover:bg-accent-dim text-white font-semibold transition-colors disabled:opacity-60"
-          >
-            {updating ? "Downloading…" : "Update & Restart"}
-          </button>
+        <div className="flex flex-col px-4 py-1.5 bg-accent/15 border-b border-accent/25 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-zinc-300">
+              Update available — <span className="text-accent font-semibold">v{updateVersion}</span>
+            </span>
+            <button
+              onClick={doUpdate}
+              disabled={updating}
+              className="no-drag text-xs px-3 py-1 rounded-lg bg-accent hover:bg-accent-dim text-white font-semibold transition-colors disabled:opacity-60"
+            >
+              {updating ? "Downloading…" : "Update & Restart"}
+            </button>
+          </div>
+          {updateError && (
+            <span className="text-[10px] text-red-400 mt-0.5">Error: {updateError}</span>
+          )}
         </div>
       )}
 
