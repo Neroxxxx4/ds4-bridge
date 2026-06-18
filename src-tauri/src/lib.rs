@@ -234,6 +234,7 @@ pub fn run() {
         .setup(move |app| {
             setup_tray(app)?;
             let window = app.get_webview_window("main").unwrap();
+            window.set_skip_taskbar(true).ok();
             let w = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {

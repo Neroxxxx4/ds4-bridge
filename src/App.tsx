@@ -91,7 +91,7 @@ function WinBtn({ onClick, title, danger, children }: { onClick: () => void; tit
     <button
       onClick={onClick}
       title={title}
-      className={`no-drag w-7 h-7 rounded flex items-center justify-center transition-colors duration-150 text-zinc-500 ${danger ? "hover:bg-red-500/80 hover:text-white" : "hover:bg-surface-3 hover:text-zinc-200"}`}
+      className={`w-7 h-7 rounded flex items-center justify-center transition-colors duration-150 text-zinc-500 ${danger ? "hover:bg-red-500/80 hover:text-white" : "hover:bg-surface-3 hover:text-zinc-200"}`}
     >
       {children}
     </button>
@@ -262,8 +262,8 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-surface overflow-hidden">
       {/* Titlebar / drag region */}
-      <div className="drag flex items-center justify-between px-4 h-10 bg-surface-1 border-b border-surface-3 flex-shrink-0">
-        <div className="flex items-center gap-2.5 no-drag">
+      <div data-tauri-drag-region className="flex items-center justify-between px-4 h-10 bg-surface-1 border-b border-surface-3 flex-shrink-0 select-none cursor-default">
+        <div className="flex items-center gap-2.5">
           <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${ctrl.connected ? "bg-green-400 animate-pulse_ring" : "bg-zinc-600"}`} />
           <span className="text-sm font-semibold text-zinc-200">DS4 Bridge</span>
           {ctrl.connected && (
