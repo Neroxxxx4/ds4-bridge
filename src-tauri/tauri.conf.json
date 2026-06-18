@@ -1,6 +1,6 @@
 {
   "productName": "DS4 Bridge",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "identifier": "com.ds4bridge.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -26,11 +26,6 @@
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false
     }
   },
   "plugins": {
