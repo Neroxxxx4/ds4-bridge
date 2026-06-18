@@ -158,7 +158,7 @@ jobs:
           with open('latest.json', 'w') as f:
             json.dump(manifest, f, indent=2)
 
-          print(f'latest.json → {asset_name}')
+          print(f'latest.json -> {asset_name}')
         env:
           APP_VERSION: ${{ steps.version.outputs.value }}
 
