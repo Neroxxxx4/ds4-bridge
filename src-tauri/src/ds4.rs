@@ -93,11 +93,11 @@ impl Ds4Device {
                 let mut report = [0u8; 32];
                 report[0] = 0x05;
                 report[1] = 0xFF;
-                report[3] = rumble_small; // right / fast motor
-                report[4] = rumble_large; // left  / slow motor
-                report[5] = r;
-                report[6] = g;
-                report[7] = b;
+                report[4] = rumble_small; // right / fast motor
+                report[5] = rumble_large; // left  / slow motor
+                report[6] = r;
+                report[7] = g;
+                report[8] = b;
                 self.device.write(&report)?;
             }
             ConnectionType::Bluetooth => {
