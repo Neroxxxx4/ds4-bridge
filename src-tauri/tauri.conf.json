@@ -1,6 +1,6 @@
 {
   "productName": "DS4 Bridge",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "identifier": "com.ds4bridge.app",
   "build": {
     "beforeDevCommand": "npm run dev",

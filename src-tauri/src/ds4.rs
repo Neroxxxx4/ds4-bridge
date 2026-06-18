@@ -18,6 +18,9 @@ pub struct Ds4State {
     pub charging: bool,
     pub connection: ConnectionType,
     pub connected: bool,
+    pub touch_active: bool,
+    pub touch_x: u16,
+    pub touch_y: u16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -179,11 +182,21 @@ fn parse_report(data: &[u8], conn: ConnectionType) -> Ds4State {
     let charging = (batt_raw & 0x10) != 0;
     let battery = ((((batt_raw & 0x0F) as u32) * 100) / 8).min(100) as u8;
 
+    let (touch_active, touch_x, touch_y) = if data.len() > 35 {
+        let active = (data[32] & 0x80) == 0;
+        let x = data[33] as u16 | ((data[34] as u16 & 0x0F) << 8);
+        let y = (data[34] as u16 >> 4) | ((data[35] as u16) << 4);
+        (active, x, y)
+    } else {
+        (false, 0, 0)
+    };
+
     Ds4State {
         lx: data[0], ly: data[1], rx: data[2], ry: data[3],
         l2: data[7], r2: data[8],
         buttons, battery, charging,
         connection: conn,
         connected: true,
+        touch_active, touch_x, touch_y,
     }
 }

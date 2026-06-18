@@ -2,6 +2,7 @@ mod ds4;
 mod vigem;
 mod audio;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use parking_lot::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -11,8 +12,43 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 use hidapi::HidApi;
-use ds4::{Ds4Device, Ds4State};
+use ds4::{Ds4Device, Ds4State, btn};
 use vigem::{XInputTarget, battery_to_rgb};
+
+// ── Settings persistence ──────────────────────────────────────────────────────
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SavedSettings {
+    lightbar:       (u8, u8, u8),
+    battery_color:  bool,
+    deadzone:       f32,
+    audio_fix:      bool,
+    touchpad_mouse: bool,
+}
+
+impl Default for SavedSettings {
+    fn default() -> Self {
+        Self { lightbar: (0, 0, 255), battery_color: false, deadzone: 0.0, audio_fix: false, touchpad_mouse: false }
+    }
+}
+
+fn save_settings(state: &AppState) {
+    let path = state.config_path.lock().clone();
+    if path.as_os_str().is_empty() { return; }
+    let s = SavedSettings {
+        lightbar:       *state.lightbar.lock(),
+        battery_color:  *state.battery_color.lock(),
+        deadzone:       *state.deadzone.lock(),
+        audio_fix:      *state.audio_fix.lock(),
+        touchpad_mouse: *state.touchpad_mouse.lock(),
+    };
+    if let Ok(json) = serde_json::to_string_pretty(&s) {
+        if let Some(parent) = path.parent() { let _ = std::fs::create_dir_all(parent); }
+        let _ = std::fs::write(&path, json);
+    }
+}
+
+// ── App state ─────────────────────────────────────────────────────────────────
 
 #[derive(Default)]
 pub struct AppState {
@@ -20,6 +56,28 @@ pub struct AppState {
     lightbar:         Mutex<(u8, u8, u8)>,
     battery_color:    Mutex<bool>,
     deadzone:         Mutex<f32>,
+    audio_fix:        Mutex<bool>,
+    touchpad_mouse:   Mutex<bool>,
+    config_path:      Mutex<PathBuf>,
+}
+
+// ── Windows mouse API ─────────────────────────────────────────────────────────
+
+#[cfg(windows)]
+#[link(name = "user32")]
+extern "system" {
+    fn mouse_event(dw_flags: u32, dx: u32, dy: u32, dw_data: u32, dw_extra_info: usize);
+}
+
+#[cfg(windows)]
+fn move_mouse_relative(dx: i32, dy: i32) {
+    unsafe { mouse_event(0x0001, dx as u32, dy as u32, 0, 0); }
+}
+
+#[cfg(windows)]
+fn click_mouse_left() {
+    unsafe { mouse_event(0x0002, 0, 0, 0, 0); }
+    unsafe { mouse_event(0x0004, 0, 0, 0, 0); }
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
@@ -43,6 +101,9 @@ fn toggle_maximize_window(window: tauri::WebviewWindow) {
 fn hide_window(window: tauri::WebviewWindow) { window.hide().ok(); }
 
 #[tauri::command]
+fn start_dragging(window: tauri::WebviewWindow) { window.start_dragging().ok(); }
+
+#[tauri::command]
 fn get_controller_state(state: State<'_, Arc<AppState>>) -> Ds4State {
     state.controller_state.lock().clone()
 }
@@ -50,12 +111,21 @@ fn get_controller_state(state: State<'_, Arc<AppState>>) -> Ds4State {
 #[tauri::command]
 fn set_lightbar(state: State<'_, Arc<AppState>>, r: u8, g: u8, b: u8) {
     *state.lightbar.lock() = (r, g, b);
+    save_settings(&state);
 }
 
 #[tauri::command]
-fn set_audio_fix(_state: State<'_, Arc<AppState>>, enable: bool) -> Result<(), String> {
+fn get_audio_fix(state: State<'_, Arc<AppState>>) -> bool {
+    *state.audio_fix.lock()
+}
+
+#[tauri::command]
+fn set_audio_fix(state: State<'_, Arc<AppState>>, enable: bool) -> Result<(), String> {
     if enable { audio::disable_ds4_audio() } else { audio::enable_ds4_audio() }
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    *state.audio_fix.lock() = enable;
+    save_settings(&state);
+    Ok(())
 }
 
 #[tauri::command]
@@ -78,6 +148,7 @@ fn get_battery_color(state: State<'_, Arc<AppState>>) -> bool {
 #[tauri::command]
 fn set_battery_color(state: State<'_, Arc<AppState>>, enable: bool) {
     *state.battery_color.lock() = enable;
+    save_settings(&state);
 }
 
 #[tauri::command]
@@ -88,6 +159,18 @@ fn get_deadzone(state: State<'_, Arc<AppState>>) -> f32 {
 #[tauri::command]
 fn set_deadzone(state: State<'_, Arc<AppState>>, value: f32) {
     *state.deadzone.lock() = value.clamp(0.0, 0.4);
+    save_settings(&state);
+}
+
+#[tauri::command]
+fn get_touchpad_mouse(state: State<'_, Arc<AppState>>) -> bool {
+    *state.touchpad_mouse.lock()
+}
+
+#[tauri::command]
+fn set_touchpad_mouse(state: State<'_, Arc<AppState>>, enable: bool) {
+    *state.touchpad_mouse.lock() = enable;
+    save_settings(&state);
 }
 
 #[tauri::command]
@@ -130,13 +213,6 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-fn show_window(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
-        let _ = w.show();
-        let _ = w.set_focus();
-    }
-}
-
 fn toggle_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         if w.is_visible().unwrap_or(false) {
@@ -155,16 +231,19 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
     let mut xinput:    Option<XInputTarget> = None;
     let mut was_connected = false;
     let mut last_battery: u8 = 100;
-    let mut notified_low = false; // fire low-battery toast once per charge cycle
+    let mut notified_low = false;
+    let mut last_touch_active = false;
+    let mut last_touch_x: u16 = 0;
+    let mut last_touch_y: u16 = 0;
+    let mut last_buttons: u32 = 0;
 
     loop {
-        // ── Device reconnect ─────────────────────────────────────────────────
         if device.is_none() {
             if let Ok(api) = HidApi::new() {
                 device = Ds4Device::try_open(&api);
                 if device.is_some() && !was_connected {
                     log::info!("DS4 connected");
-                    notified_low = false; // reset for new charge session
+                    notified_low = false;
                 }
             }
         }
@@ -176,19 +255,16 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
             }
         }
 
-        // ── Read & map ───────────────────────────────────────────────────────
         match device.as_mut().and_then(|d| d.read_state()) {
             Some(s) => {
                 was_connected = true;
 
-                // Feature 2: battery color mode overrides manual lightbar
                 let (r, g, b) = if *state.battery_color.lock() {
                     battery_to_rgb(s.battery)
                 } else {
                     *state.lightbar.lock()
                 };
 
-                // Feature 3: pull rumble values that a game sent to virtual Xbox pad
                 let (rumble_large, rumble_small) = xinput
                     .as_ref()
                     .map(|x| *x.rumble.lock())
@@ -198,7 +274,6 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
                     let _ = d.send_output(r, g, b, rumble_small, rumble_large);
                 }
 
-                // Feature 1: low-battery toast (once per charge cycle, at 20%)
                 if s.battery <= 20 && last_battery > 20 && !notified_low && !s.charging {
                     notified_low = true;
                     let _ = app.notification()
@@ -207,12 +282,9 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
                         .body(format!("Controller battery at {}%. Plug in soon.", s.battery))
                         .show();
                 }
-                if s.charging || s.battery > 20 {
-                    notified_low = false; // reset when charged back up
-                }
+                if s.charging || s.battery > 20 { notified_low = false; }
                 last_battery = s.battery;
 
-                // Update XInput virtual pad
                 let deadzone = *state.deadzone.lock();
                 if let Some(x) = xinput.as_mut() {
                     if let Err(e) = x.update(&s, deadzone) {
@@ -220,6 +292,28 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
                         xinput = None;
                     }
                 }
+
+                // Touchpad-as-mouse
+                if *state.touchpad_mouse.lock() {
+                    if s.touch_active {
+                        if last_touch_active {
+                            let dx = (s.touch_x as i32 - last_touch_x as i32) * 2;
+                            let dy = (s.touch_y as i32 - last_touch_y as i32) * 2;
+                            if dx != 0 || dy != 0 {
+                                #[cfg(windows)] move_mouse_relative(dx, dy);
+                            }
+                        }
+                        last_touch_x = s.touch_x;
+                        last_touch_y = s.touch_y;
+                    }
+                    last_touch_active = s.touch_active;
+
+                    let touchpad_just_pressed = (s.buttons & btn::TOUCHPAD != 0) && (last_buttons & btn::TOUCHPAD == 0);
+                    if touchpad_just_pressed {
+                        #[cfg(windows)] click_mouse_left();
+                    }
+                }
+                last_buttons = s.buttons;
 
                 *state.controller_state.lock() = s.clone();
                 let _ = app.emit("controller-update", &s);
@@ -246,7 +340,6 @@ pub fn run() {
     env_logger::init();
 
     let state = Arc::new(AppState::default());
-    *state.lightbar.lock() = (0, 0, 255); // default: PS blue
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -261,6 +354,7 @@ pub fn run() {
             get_vigem_status,
             get_controller_state,
             set_lightbar,
+            get_audio_fix,
             set_audio_fix,
             get_autostart,
             set_autostart,
@@ -271,10 +365,32 @@ pub fn run() {
             minimize_window,
             toggle_maximize_window,
             hide_window,
+            start_dragging,
             get_deadzone,
             set_deadzone,
+            get_touchpad_mouse,
+            set_touchpad_mouse,
         ])
         .setup(move |app| {
+            // Load persisted settings
+            if let Ok(config_dir) = app.path().app_data_dir() {
+                let path = config_dir.join("settings.json");
+                let settings: SavedSettings = std::fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default();
+                *state.lightbar.lock()       = settings.lightbar;
+                *state.battery_color.lock()  = settings.battery_color;
+                *state.deadzone.lock()        = settings.deadzone;
+                *state.audio_fix.lock()       = settings.audio_fix;
+                *state.touchpad_mouse.lock()  = settings.touchpad_mouse;
+                // Re-apply audio fix if it was enabled
+                if settings.audio_fix { let _ = audio::disable_ds4_audio(); }
+                *state.config_path.lock() = path;
+            } else {
+                *state.lightbar.lock() = (0, 0, 255);
+            }
+
             setup_tray(app)?;
             let window = app.get_webview_window("main").unwrap();
             let w = window.clone();

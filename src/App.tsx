@@ -175,12 +175,15 @@ export default function App() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [deadzone, setDeadzone] = useState(0);
   const deadzoneDebounce = useRef<ReturnType<typeof setTimeout>>();
+  const [touchpadMouse, setTouchpadMouse] = useState(false);
 
   useEffect(() => {
     invoke<boolean>("get_vigem_status").then(setVigem);
     invoke<boolean>("get_autostart").then(setAutostart);
     invoke<boolean>("get_battery_color").then(setBatteryColor);
     invoke<number>("get_deadzone").then(v => setDeadzone(Math.round(v * 100)));
+    invoke<boolean>("get_audio_fix").then(setAudioFix);
+    invoke<boolean>("get_touchpad_mouse").then(setTouchpadMouse);
     const unlisten = listen<Ds4State>("controller-update", (e) => setCtrl(e.payload));
     const unlistenVigem = listen<string>("vigem-install", (e) => {
       if (e.payload === "downloading") setVigemInstall("downloading");
@@ -246,6 +249,12 @@ export default function App() {
     }
   }, [audioFix]);
 
+  const toggleTouchpadMouse = useCallback(async () => {
+    const next = !touchpadMouse;
+    await invoke("set_touchpad_mouse", { enable: next });
+    setTouchpadMouse(next);
+  }, [touchpadMouse]);
+
   const doUpdate = useCallback(async () => {
     if (!pendingUpdate.current) return;
     setUpdating(true);
@@ -265,8 +274,11 @@ export default function App() {
     <div className="h-screen flex flex-col bg-surface overflow-hidden">
       {/* Titlebar */}
       <div className="flex items-center justify-between h-10 bg-surface-1 border-b border-surface-3 flex-shrink-0 select-none">
-        {/* Left: drag region fills remaining space */}
-        <div data-tauri-drag-region className="flex items-center gap-2.5 px-4 flex-1 h-full cursor-default">
+        {/* Left: drag region — mousedown triggers native drag */}
+        <div
+          className="flex items-center gap-2.5 px-4 flex-1 h-full cursor-default select-none"
+          onMouseDown={(e) => { if (e.buttons === 1) invoke("start_dragging"); }}
+        >
           <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${ctrl.connected ? "bg-green-400 animate-pulse_ring" : "bg-zinc-600"}`} />
           <span className="text-sm font-semibold text-zinc-200">DS4 Bridge</span>
           {ctrl.connected && (
@@ -557,6 +569,17 @@ export default function App() {
               className="no-drag w-full accent-accent h-1.5 cursor-pointer"
             />
             <p className="text-[10px] text-zinc-600">Ignore stick input below this threshold. Helps with drift.</p>
+          </div>
+
+          {/* Touchpad as mouse */}
+          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-300">Touchpad Mouse</span>
+              <Toggle checked={touchpadMouse} onChange={toggleTouchpadMouse} />
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">
+              Swipe the touchpad to move the cursor. Press it to left-click.
+            </p>
           </div>
 
           {/* Info */}
