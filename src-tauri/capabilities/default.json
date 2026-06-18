@@ -10,7 +10,6 @@
     "notification:default",
     "notification:allow-notify",
     "updater:default",
-    "process:default",
-    "process:allow-relaunch"
+    "process:default"
   ]
 }
