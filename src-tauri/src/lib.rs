@@ -106,13 +106,13 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         .tooltip("DS4 Bridge")
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => show_window(app),
+            "show" => toggle_window(app),
             "quit" => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
-                show_window(tray.app_handle());
+                toggle_window(tray.app_handle());
             }
         })
         .build(app)?;
@@ -123,6 +123,17 @@ fn show_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.set_focus();
+    }
+}
+
+fn toggle_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        if w.is_visible().unwrap_or(false) {
+            let _ = w.hide();
+        } else {
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
     }
 }
 
