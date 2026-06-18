@@ -17,19 +17,15 @@ use vigem::{XInputTarget, battery_to_rgb};
 
 // ── Settings persistence ──────────────────────────────────────────────────────
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct SavedSettings {
-    lightbar:       (u8, u8, u8),
-    battery_color:  bool,
-    deadzone:       f32,
-    audio_fix:      bool,
-    touchpad_mouse: bool,
-}
+fn default_lightbar() -> (u8, u8, u8) { (0, 0, 255) }
 
-impl Default for SavedSettings {
-    fn default() -> Self {
-        Self { lightbar: (0, 0, 255), battery_color: false, deadzone: 0.0, audio_fix: false, touchpad_mouse: false }
-    }
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct SavedSettings {
+    #[serde(default = "default_lightbar")] lightbar:       (u8, u8, u8),
+    #[serde(default)]                      battery_color:  bool,
+    #[serde(default)]                      deadzone:       f32,
+    #[serde(default)]                      audio_fix:      bool,
+    #[serde(default)]                      touchpad_mouse: bool,
 }
 
 fn save_settings(state: &AppState) {
@@ -106,6 +102,11 @@ fn start_dragging(window: tauri::WebviewWindow) { window.start_dragging().ok(); 
 #[tauri::command]
 fn get_controller_state(state: State<'_, Arc<AppState>>) -> Ds4State {
     state.controller_state.lock().clone()
+}
+
+#[tauri::command]
+fn get_lightbar(state: State<'_, Arc<AppState>>) -> (u8, u8, u8) {
+    *state.lightbar.lock()
 }
 
 #[tauri::command]
@@ -227,6 +228,9 @@ fn toggle_window(app: &AppHandle) {
 // ── Background polling loop ───────────────────────────────────────────────────
 
 fn poll_loop(app: AppHandle, state: Arc<AppState>) {
+    use std::time::{Duration, Instant};
+    let throttle = Duration::from_secs(1);
+
     let mut device:    Option<Ds4Device>   = None;
     let mut xinput:    Option<XInputTarget> = None;
     let mut was_connected = false;
@@ -236,9 +240,12 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
     let mut last_touch_x: u16 = 0;
     let mut last_touch_y: u16 = 0;
     let mut last_buttons: u32 = 0;
+    let mut last_device_check = Instant::now() - throttle;
+    let mut last_vigem_check  = Instant::now() - throttle;
 
     loop {
-        if device.is_none() {
+        if device.is_none() && last_device_check.elapsed() >= throttle {
+            last_device_check = Instant::now();
             if let Ok(api) = HidApi::new() {
                 device = Ds4Device::try_open(&api);
                 if device.is_some() && !was_connected {
@@ -248,10 +255,13 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
             }
         }
 
-        if xinput.is_none() && audio::is_vigem_installed() {
-            match XInputTarget::connect() {
-                Ok(t)  => { xinput = Some(t); log::info!("ViGEm connected"); }
-                Err(e) => log::warn!("ViGEm: {e}"),
+        if xinput.is_none() && last_vigem_check.elapsed() >= throttle {
+            last_vigem_check = Instant::now();
+            if audio::is_vigem_installed() {
+                match XInputTarget::connect() {
+                    Ok(t)  => { xinput = Some(t); log::info!("ViGEm connected"); }
+                    Err(e) => log::warn!("ViGEm: {e}"),
+                }
             }
         }
 
@@ -294,25 +304,20 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
                 }
 
                 // Touchpad-as-mouse
-                if *state.touchpad_mouse.lock() {
-                    if s.touch_active {
-                        if last_touch_active {
-                            let dx = (s.touch_x as i32 - last_touch_x as i32) * 2;
-                            let dy = (s.touch_y as i32 - last_touch_y as i32) * 2;
-                            if dx != 0 || dy != 0 {
-                                #[cfg(windows)] move_mouse_relative(dx, dy);
-                            }
-                        }
-                        last_touch_x = s.touch_x;
-                        last_touch_y = s.touch_y;
-                    }
-                    last_touch_active = s.touch_active;
-
-                    let touchpad_just_pressed = (s.buttons & btn::TOUCHPAD != 0) && (last_buttons & btn::TOUCHPAD == 0);
-                    if touchpad_just_pressed {
-                        #[cfg(windows)] click_mouse_left();
+                let touchpad_mouse = *state.touchpad_mouse.lock();
+                if touchpad_mouse && s.touch_active && last_touch_active {
+                    let dx = (s.touch_x as i32 - last_touch_x as i32) * 2;
+                    let dy = (s.touch_y as i32 - last_touch_y as i32) * 2;
+                    if dx != 0 || dy != 0 {
+                        #[cfg(windows)] move_mouse_relative(dx, dy);
                     }
                 }
+                if touchpad_mouse && (s.buttons & btn::TOUCHPAD != 0) && (last_buttons & btn::TOUCHPAD == 0) {
+                    #[cfg(windows)] click_mouse_left();
+                }
+                // Always update tracking so enabling mid-session doesn't jump
+                last_touch_active = s.touch_active;
+                if s.touch_active { last_touch_x = s.touch_x; last_touch_y = s.touch_y; }
                 last_buttons = s.buttons;
 
                 *state.controller_state.lock() = s.clone();
@@ -321,6 +326,10 @@ fn poll_loop(app: AppHandle, state: Arc<AppState>) {
             None if was_connected => {
                 was_connected = false;
                 device = None;
+                // Send neutral inputs so game doesn't see frozen sticks/buttons
+                if let Some(x) = xinput.as_mut() {
+                    let _ = x.update(&Ds4State { lx: 128, ly: 128, rx: 128, ry: 128, connected: true, ..Default::default() }, 0.0);
+                }
                 let mut s = Ds4State::default();
                 s.connected = false;
                 *state.controller_state.lock() = s.clone();
@@ -353,6 +362,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_vigem_status,
             get_controller_state,
+            get_lightbar,
             set_lightbar,
             get_audio_fix,
             set_audio_fix,

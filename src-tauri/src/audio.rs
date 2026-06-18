@@ -53,7 +53,7 @@ fn run_ps(script: &str) -> Result<()> {
         .output()?;
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
-        log::warn!("powershell: {}", err.trim());
+        anyhow::bail!("powershell: {}", err.trim());
     }
     Ok(())
 }

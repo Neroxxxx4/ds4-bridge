@@ -184,6 +184,9 @@ export default function App() {
     invoke<number>("get_deadzone").then(v => setDeadzone(Math.round(v * 100)));
     invoke<boolean>("get_audio_fix").then(setAudioFix);
     invoke<boolean>("get_touchpad_mouse").then(setTouchpadMouse);
+    invoke<[number, number, number]>("get_lightbar").then(([r, g, b]) => {
+      setColor("#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join(""));
+    });
     const unlisten = listen<Ds4State>("controller-update", (e) => setCtrl(e.payload));
     const unlistenVigem = listen<string>("vigem-install", (e) => {
       if (e.payload === "downloading") setVigemInstall("downloading");
