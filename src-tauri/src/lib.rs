@@ -30,7 +30,13 @@ fn get_vigem_status() -> bool { audio::is_vigem_installed() }
 fn minimize_window(window: tauri::WebviewWindow) { window.minimize().ok(); }
 
 #[tauri::command]
-fn toggle_maximize_window(window: tauri::WebviewWindow) { window.toggle_maximize().ok(); }
+fn toggle_maximize_window(window: tauri::WebviewWindow) {
+    if window.is_maximized().unwrap_or(false) {
+        window.unmaximize().ok();
+    } else {
+        window.maximize().ok();
+    }
+}
 
 #[tauri::command]
 fn hide_window(window: tauri::WebviewWindow) { window.hide().ok(); }
