@@ -27,6 +27,15 @@ pub struct AppState {
 fn get_vigem_status() -> bool { audio::is_vigem_installed() }
 
 #[tauri::command]
+fn minimize_window(window: tauri::WebviewWindow) { window.minimize().ok(); }
+
+#[tauri::command]
+fn toggle_maximize_window(window: tauri::WebviewWindow) { window.toggle_maximize().ok(); }
+
+#[tauri::command]
+fn hide_window(window: tauri::WebviewWindow) { window.hide().ok(); }
+
+#[tauri::command]
 fn get_controller_state(state: State<'_, Arc<AppState>>) -> Ds4State {
     state.controller_state.lock().clone()
 }
@@ -230,11 +239,13 @@ pub fn run() {
             set_battery_color,
             open_vigem_download,
             install_vigem_driver,
+            minimize_window,
+            toggle_maximize_window,
+            hide_window,
         ])
         .setup(move |app| {
             setup_tray(app)?;
             let window = app.get_webview_window("main").unwrap();
-            window.set_skip_taskbar(true).ok();
             let w = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {

@@ -1,6 +1,6 @@
 {
   "productName": "DS4 Bridge",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "identifier": "com.ds4bridge.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -21,8 +21,7 @@
         "fullscreen": false,
         "decorations": false,
         "transparent": false,
-        "center": true,
-        "skipTaskbar": true
+        "center": true
       }
     ],
     "security": {

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
@@ -261,9 +260,10 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-surface overflow-hidden">
-      {/* Titlebar / drag region */}
-      <div data-tauri-drag-region className="flex items-center justify-between px-4 h-10 bg-surface-1 border-b border-surface-3 flex-shrink-0 select-none cursor-default">
-        <div className="flex items-center gap-2.5">
+      {/* Titlebar */}
+      <div className="flex items-center justify-between h-10 bg-surface-1 border-b border-surface-3 flex-shrink-0 select-none">
+        {/* Left: drag region fills remaining space */}
+        <div data-tauri-drag-region className="flex items-center gap-2.5 px-4 flex-1 h-full cursor-default">
           <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${ctrl.connected ? "bg-green-400 animate-pulse_ring" : "bg-zinc-600"}`} />
           <span className="text-sm font-semibold text-zinc-200">DS4 Bridge</span>
           {ctrl.connected && (
@@ -272,16 +272,17 @@ export default function App() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        {/* Right: battery + window controls — completely outside drag region */}
+        <div className="flex items-center gap-1 px-2 h-full flex-shrink-0">
           <Battery level={ctrl.battery} charging={ctrl.charging} connected={ctrl.connected} />
-          <div className="flex items-center gap-0.5 ml-3">
-            <WinBtn title="Minimize" onClick={() => getCurrentWindow().minimize()}>
+          <div className="flex items-center gap-0.5 ml-2">
+            <WinBtn title="Minimize" onClick={() => invoke("minimize_window")}>
               <svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="8" x2="9" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </WinBtn>
-            <WinBtn title="Maximize" onClick={() => getCurrentWindow().toggleMaximize()}>
+            <WinBtn title="Maximize" onClick={() => invoke("toggle_maximize_window")}>
               <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
             </WinBtn>
-            <WinBtn title="Close to tray" onClick={() => getCurrentWindow().hide()} danger>
+            <WinBtn title="Close to tray" onClick={() => invoke("hide_window")} danger>
               <svg width="10" height="10" viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="8" y1="2" x2="2" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </WinBtn>
           </div>
