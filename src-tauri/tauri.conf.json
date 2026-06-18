@@ -36,7 +36,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERFQzVGRURDQjA2N0ZENjQKUldSay9XZXczUDdGM3A3RXFkeXhvQUsvWVdHV2ZWUkQ4UmpRZm8yMDNrQWkxdWJZTnd6Qko0YTAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2MUNEMERBMDdBRjkxQjMKUldTemthOEgydEFjOXRwWXBxNUk0bHI1SUlwQW1QNkJJb2w3NG5BRlZDcGhkYXg0RWl3S2loc2YK",
       "endpoints": [
         "https://github.com/Neroxxxx4/ds4-bridge/releases/latest/download/latest.json"
       ]
