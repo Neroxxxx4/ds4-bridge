@@ -14,17 +14,24 @@ Built with [Tauri 2](https://tauri.app) (Rust + React). Ships as a single `.exe`
 
 ![DS4 Bridge UI](docs/screenshot.png)
 
+> Light and dark themes available — toggle in the System tab.
+
 ---
 
 ## Features
 
 - **XInput emulation** — makes your DS4 look like an Xbox 360 pad to any game via [ViGEmBus](https://github.com/nefarius/ViGEmBus)
-- **Lightbar control** — pick any RGB color manually, or enable **battery color mode** (green → amber → red)
-- **Battery monitor** — live percentage shown in the UI, low-battery toast notification at 20%
+- **Live controller monitor** — animated DS4 silhouette showing every button, stick, and trigger in real-time
+- **Lightbar control** — pick any RGB color, or enable **battery color mode** (green → amber → red)
+- **Battery monitor** — live percentage in the title bar and a low-battery inline banner at 20%
+- **Stick deadzone** — per-axis deadzone slider to tame stick drift
+- **Touchpad as mouse** — swipe the DS4 touchpad to move your cursor; press to click
 - **Rumble passthrough** — game vibration routed back to the DS4 motors
 - **Audio fix** — disables the phantom microphone/speaker Windows registers when you plug in a DS4
 - **Launch on startup** — optional Windows startup entry
 - **Minimize to tray** — closing the window keeps it running in the system tray
+- **Light / dark theme** — toggle in the System tab, persisted across restarts
+- **Persistent settings** — all preferences saved and restored automatically
 
 ## Requirements
 
