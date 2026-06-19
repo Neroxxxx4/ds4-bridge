@@ -5,21 +5,25 @@ const VIGEM_INSTALLER_URL: &str =
 
 pub fn disable_ds4_audio() -> Result<()> {
     run_ps(r#"
-        Get-PnpDevice |
-        Where-Object {
-            ($_.FriendlyName -match 'Wireless Controller' -or $_.FriendlyName -match 'DualShock') -and
+        $ErrorActionPreference = 'Stop'
+        $found = @(Get-PnpDevice | Where-Object {
+            ($_.FriendlyName -match 'Wireless Controller|DualShock|DualSense|PlayStation') -and
             ($_.Class -eq 'AudioEndpoint' -or $_.Class -eq 'Media')
-        } | Disable-PnpDevice -Confirm:$false
+        })
+        if ($found.Count -eq 0) { exit 0 }
+        $found | Disable-PnpDevice -Confirm:$false
     "#)
 }
 
 pub fn enable_ds4_audio() -> Result<()> {
     run_ps(r#"
-        Get-PnpDevice |
-        Where-Object {
-            ($_.FriendlyName -match 'Wireless Controller' -or $_.FriendlyName -match 'DualShock') -and
+        $ErrorActionPreference = 'Stop'
+        $found = @(Get-PnpDevice | Where-Object {
+            ($_.FriendlyName -match 'Wireless Controller|DualShock|DualSense|PlayStation') -and
             ($_.Class -eq 'AudioEndpoint' -or $_.Class -eq 'Media')
-        } | Enable-PnpDevice -Confirm:$false
+        })
+        if ($found.Count -eq 0) { exit 0 }
+        $found | Enable-PnpDevice -Confirm:$false
     "#)
 }
 
@@ -52,8 +56,15 @@ fn run_ps(script: &str) -> Result<()> {
         .args(["-NonInteractive", "-NoProfile", "-Command", script])
         .output()?;
     if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        anyhow::bail!("powershell: {}", err.trim());
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let msg = [stdout.trim(), stderr.trim()]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" | ");
+        anyhow::bail!("{}", if msg.is_empty() { format!("exit {}", out.status) } else { msg });
     }
     Ok(())
 }

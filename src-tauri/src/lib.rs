@@ -388,7 +388,8 @@ pub fn run() {
                 let settings: SavedSettings = std::fs::read_to_string(&path)
                     .ok()
                     .and_then(|s| serde_json::from_str(&s).ok())
-                    .unwrap_or_default();
+                    // unwrap_or_default() gives black lightbar; empty-object parse uses serde defaults
+                    .unwrap_or_else(|| serde_json::from_str("{}").unwrap());
                 *state.lightbar.lock()       = settings.lightbar;
                 *state.battery_color.lock()  = settings.battery_color;
                 *state.deadzone.lock()        = settings.deadzone;

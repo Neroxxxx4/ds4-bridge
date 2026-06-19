@@ -204,6 +204,7 @@ export default function App() {
   const [color, setColor] = useState("#D42E86");
   const [audioFix, setAudioFix] = useState(false);
   const [audioStatus, setAudioStatus] = useState<"idle" | "working" | "done" | "error">("idle");
+  const [audioError, setAudioError] = useState("");
   const colorDebounce = useRef<ReturnType<typeof setTimeout>>();
   const pendingUpdate = useRef<Update | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
@@ -269,12 +270,20 @@ export default function App() {
   }, []);
 
   const toggleAudioFix = useCallback(async () => {
-    const next = !audioFix; setAudioStatus("working");
+    if (audioStatus === "working") return;
+    const next = !audioFix; setAudioStatus("working"); setAudioError("");
     try {
       await invoke("set_audio_fix", { enable: next });
       setAudioFix(next); setAudioStatus("done"); setTimeout(() => setAudioStatus("idle"), 2000);
-    } catch { setAudioStatus("error"); setTimeout(() => setAudioStatus("idle"), 3000); }
-  }, [audioFix]);
+    } catch (e) {
+      const msg = String(e);
+      const clean = /0x80070005|access to a resource|access is denied/i.test(msg)
+        ? "Requires Administrator — right-click DS4 Bridge → Run as administrator"
+        : msg.replace(/^powershell:\s*/i, "").slice(0, 80);
+      setAudioError(clean);
+      setAudioStatus("error"); setTimeout(() => { setAudioStatus("idle"); setAudioError(""); }, 6000);
+    }
+  }, [audioFix, audioStatus]);
 
   const toggleTouchpadMouse = useCallback(async () => {
     const next = !touchpadMouse; await invoke("set_touchpad_mouse", { enable: next }); setTouchpadMouse(next);
@@ -321,7 +330,7 @@ export default function App() {
     }}>
       {/* Titlebar */}
       <div style={{ height: 40, flex: "none", display: "flex", alignItems: "stretch", borderBottom: "1px solid var(--border)", background: "var(--titlebar)" }}
-        onMouseDown={(e) => { if (e.buttons === 1) invoke("start_dragging"); }}>
+        onMouseDown={(e) => { const el = e.target as HTMLElement; if (e.buttons === 1 && !el.closest('button')) invoke("start_dragging"); }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, paddingLeft: 14 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, animation: dotPulse ? "ds4-conn 2s ease-in-out infinite" : "none" }} />
           <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-.01em" }}>DS4 Bridge</span>
@@ -537,7 +546,7 @@ export default function App() {
                     <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Disable the phantom DS4 mic &amp; speaker</div>
                     {audioStatus === "working" && <span style={{ fontSize: 11, color: "#e8920c" }}>Applying…</span>}
                     {audioStatus === "done" && <span style={{ fontSize: 11, color: "#2ca84e" }}>Done</span>}
-                    {audioStatus === "error" && <span style={{ fontSize: 11, color: "#e0392c" }}>Failed — try as Admin</span>}
+                    {audioStatus === "error" && <span style={{ fontSize: 11, color: "#e0392c" }}>{audioError || "Failed"}</span>}
                   </div>
                   <Toggle checked={audioFix} onChange={toggleAudioFix} />
                 </div>
