@@ -30,132 +30,168 @@ const EMPTY: Ds4State = {
   connection: "Usb", connected: false,
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const ACCENT = "#D42E86";
+
+// ── Theme tokens ──────────────────────────────────────────────────────────────
+
+type Theme = "light" | "dark";
+
+const TOKENS: Record<Theme, Record<string, string>> = {
+  light: {
+    desktop: "#eceef2",
+    surface: "#ffffff", surface2: "#f9f9fb", field: "#ffffff",
+    border: "#ececf0", divider: "#f0f0f2",
+    text: "#1d1d1f", text2: "#86868b", text3: "#a1a1a8", text4: "#b8b8be",
+    titlebar: "#fbfbfd", sidebar: "#f5f5f7", toggleOff: "#e3e3e8",
+    overlay: "rgba(245,245,248,.82)", hover: "#f0f0f2", winHover: "#e7e7eb",
+    trackBorder: "#bcbcc4", chip: "#fafafb", checklist: "#f7f7f9",
+    accentSoft: "#fbe9f3", ghost: "#d4d4da",
+    padBody: "#ffffff", padEdge: "#eeeef2", padKnob: "#c6c6cd",
+  },
+  dark: {
+    desktop: "#0e0e12",
+    surface: "#232329", surface2: "#1b1b20", field: "#26262c",
+    border: "#34343c", divider: "#2e2e35",
+    text: "#f2f2f5", text2: "#9a9aa2", text3: "#74747c", text4: "#5a5a62",
+    titlebar: "#1e1e23", sidebar: "#191a1e", toggleOff: "#3a3a42",
+    overlay: "rgba(10,10,13,.72)", hover: "#2e2e35", winHover: "#2e2e35",
+    trackBorder: "#56565e", chip: "#26262c", checklist: "#26262c",
+    accentSoft: "#3a2030", ghost: "#3e3e46",
+    padBody: "#ececf0", padEdge: "#d6d6dc", padKnob: "#a8a8b0",
+  },
+};
 
 function pressed(buttons: number, mask: number) { return (buttons & mask) !== 0; }
 
-function StickViz({ x, y, label }: { x: number; y: number; label: string }) {
-  const nx = (x - 128) / 128;
-  const ny = (y - 128) / 128;
-  const cx = 28 + nx * 18;
-  const cy = 28 + ny * 18;
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width="56" height="56" className="flex-shrink-0">
-        <circle cx="28" cy="28" r="24" fill="#1c1c26" stroke="#2a2a38" strokeWidth="1.5" />
-        <line x1="4" y1="28" x2="52" y2="28" stroke="#2a2a38" strokeWidth="1" />
-        <line x1="28" y1="4" x2="28" y2="52" stroke="#2a2a38" strokeWidth="1" />
-        <circle cx={cx} cy={cy} r="8" fill="#6c63ff" opacity="0.9" />
-        <circle cx={cx} cy={cy} r="4" fill="#a8a2ff" />
-      </svg>
-      <span className="text-[10px] text-zinc-500 font-medium tracking-widest uppercase">{label}</span>
-    </div>
-  );
-}
+// ── Live controller silhouette (top-down DS4, lights up from real input) ───────
 
-function TriggerBar({ value, label }: { value: number; label: string }) {
-  const pct = Math.round((value / 255) * 100);
+function Pad({ ctrl, glow }: { ctrl: Ds4State; glow: string }) {
+  const b = ctrl.buttons;
+  const P = (m: number) => pressed(b, m);
+  const ffill = (on: boolean) => (on ? glow : "var(--padEdge)");
+  const gl = (on: boolean) => (on ? `drop-shadow(0 0 5px ${glow})` : "none");
+  const tr = "fill 70ms ease, filter 70ms ease, background 70ms ease, box-shadow 70ms ease";
+  const lxN = (ctrl.lx - 128) / 128, lyN = (ctrl.ly - 128) / 128;
+  const rxN = (ctrl.rx - 128) / 128, ryN = (ctrl.ry - 128) / 128;
+  const l2pct = Math.round((ctrl.l2 / 255) * 100);
+  const r2pct = Math.round((ctrl.r2 / 255) * 100);
+
+  const Btn = ({ on, color, label, style }: { on: boolean; color: string; label?: string; style: React.CSSProperties }) => (
+    <div style={{
+      position: "absolute", display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 11, fontWeight: 700, transition: tr,
+      color: on ? "#fff" : "var(--text3)",
+      background: on ? color : "var(--padEdge)",
+      boxShadow: on ? `0 0 9px ${color}` : "none",
+      ...style,
+    }}>{label}</div>
+  );
+
   return (
-    <div className="flex flex-col items-center gap-1.5 w-10">
-      <div className="relative w-3 h-20 bg-surface-2 rounded-full overflow-hidden flex flex-col-reverse">
-        <div
-          className="w-full rounded-full transition-all duration-75"
-          style={{ height: `${pct}%`, background: "#6c63ff" }}
-        />
+    <div style={{ position: "relative", width: 300, height: 196 }}>
+      {/* Grips + body */}
+      <div style={{ position: "absolute", left: 44, top: 70, width: 56, height: 110, borderRadius: 28, transform: "rotate(16deg)", background: "var(--padBody)", boxShadow: "0 10px 24px rgba(0,0,0,.18)" }} />
+      <div style={{ position: "absolute", right: 44, top: 70, width: 56, height: 110, borderRadius: 28, transform: "rotate(-16deg)", background: "var(--padBody)", boxShadow: "0 10px 24px rgba(0,0,0,.18)" }} />
+      <div style={{ position: "absolute", left: 60, top: 40, width: 180, height: 96, borderRadius: 48, background: "var(--padBody)", boxShadow: "0 14px 30px rgba(0,0,0,.2)" }} />
+
+      {/* Shoulders */}
+      <div style={{ position: "absolute", left: 74, top: 30, width: 44, height: 16, borderRadius: 8, transition: tr, background: ffill(P(BTN.L1)), filter: gl(P(BTN.L1)) }} />
+      <div style={{ position: "absolute", right: 74, top: 30, width: 44, height: 16, borderRadius: 8, transition: tr, background: ffill(P(BTN.R1)), filter: gl(P(BTN.R1)) }} />
+      {/* Triggers (fill by analog value) */}
+      <div style={{ position: "absolute", left: 84, top: 8, width: 24, height: 20, borderRadius: 6, background: "var(--padEdge)", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
+        <div style={{ width: "100%", height: `${l2pct}%`, background: glow, transition: "height 70ms linear" }} />
       </div>
-      <span className="text-[10px] text-zinc-500 font-medium">{label}</span>
-      <span className="text-[10px] text-zinc-400 tabular-nums">{pct}%</span>
+      <div style={{ position: "absolute", right: 84, top: 8, width: 24, height: 20, borderRadius: 6, background: "var(--padEdge)", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
+        <div style={{ width: "100%", height: `${r2pct}%`, background: glow, transition: "height 70ms linear" }} />
+      </div>
+
+      {/* Lightbar */}
+      <div style={{ position: "absolute", left: 124, top: 44, width: 52, height: 8, borderRadius: 4, background: glow, boxShadow: `0 0 12px ${glow}` }} />
+
+      {/* Touchpad */}
+      <div style={{ position: "absolute", left: 118, top: 58, width: 64, height: 34, borderRadius: 9, transition: tr, background: P(BTN.TOUCHPAD) ? glow : "var(--padEdge)", boxShadow: P(BTN.TOUCHPAD) ? `0 0 10px ${glow}` : "none" }} />
+      {/* Share / Options */}
+      <div style={{ position: "absolute", left: 108, top: 64, width: 6, height: 14, borderRadius: 3, transition: tr, background: ffill(P(BTN.SHARE)) }} />
+      <div style={{ position: "absolute", right: 108, top: 64, width: 6, height: 14, borderRadius: 3, transition: tr, background: ffill(P(BTN.OPTIONS)) }} />
+
+      {/* D-Pad */}
+      <Btn on={P(BTN.DPAD_N)} color={glow} style={{ left: 96, top: 84, width: 16, height: 18, borderRadius: 4 }} />
+      <Btn on={P(BTN.DPAD_S)} color={glow} style={{ left: 96, top: 116, width: 16, height: 18, borderRadius: 4 }} />
+      <Btn on={P(BTN.DPAD_W)} color={glow} style={{ left: 76, top: 104, width: 18, height: 16, borderRadius: 4 }} />
+      <Btn on={P(BTN.DPAD_E)} color={glow} style={{ left: 114, top: 104, width: 18, height: 16, borderRadius: 4 }} />
+
+      {/* Face buttons */}
+      <Btn on={P(BTN.TRIANGLE)} color="#2bbd9b" label="△" style={{ right: 92, top: 82, width: 22, height: 22, borderRadius: "50%" }} />
+      <Btn on={P(BTN.SQUARE)} color="#c77dd6" label="□" style={{ right: 116, top: 104, width: 22, height: 22, borderRadius: "50%" }} />
+      <Btn on={P(BTN.CIRCLE)} color="#e8517f" label="○" style={{ right: 68, top: 104, width: 22, height: 22, borderRadius: "50%" }} />
+      <Btn on={P(BTN.CROSS)} color="#5bb6e8" label="✕" style={{ right: 92, top: 126, width: 22, height: 22, borderRadius: "50%" }} />
+
+      {/* Sticks */}
+      <div style={{ position: "absolute", left: 108, top: 128, width: 38, height: 38, borderRadius: "50%", background: "var(--padEdge)", transition: tr, boxShadow: P(BTN.L3) ? `0 0 10px ${glow}` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 22, height: 22, borderRadius: "50%", background: P(BTN.L3) ? glow : "var(--padKnob)", transform: `translate(${lxN * 6}px, ${lyN * 6}px)`, transition: "transform 60ms linear, background 70ms ease" }} />
+      </div>
+      <div style={{ position: "absolute", right: 108, top: 128, width: 38, height: 38, borderRadius: "50%", background: "var(--padEdge)", transition: tr, boxShadow: P(BTN.R3) ? `0 0 10px ${glow}` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 22, height: 22, borderRadius: "50%", background: P(BTN.R3) ? glow : "var(--padKnob)", transform: `translate(${rxN * 6}px, ${ryN * 6}px)`, transition: "transform 60ms linear, background 70ms ease" }} />
+      </div>
+
+      {/* PS button */}
+      <div style={{ position: "absolute", left: "50%", top: 150, width: 14, height: 14, marginLeft: -7, borderRadius: "50%", transition: tr, background: ffill(P(BTN.PS)), filter: gl(P(BTN.PS)) }} />
     </div>
   );
 }
 
-function BtnDot({ active, color, label }: { active: boolean; color: string; label: string }) {
+// ── Small UI atoms ──────────────────────────────────────────────────────────
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
-    <div
-      className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-[9px] font-bold transition-all duration-75"
-      style={{
-        borderColor: active ? color : "#2a2a38",
-        background: active ? color + "33" : "transparent",
-        color: active ? color : "#3a3a50",
-        boxShadow: active ? `0 0 8px ${color}66` : "none",
-      }}
-    >
-      {label}
-    </div>
+    <button onClick={onChange} className="no-drag" style={{
+      position: "relative", width: 38, height: 23, borderRadius: 12, border: "none",
+      cursor: "pointer", flex: "none", padding: 0, transition: "background .22s",
+      background: checked ? ACCENT : "var(--toggleOff)",
+    }}>
+      <span style={{
+        position: "absolute", top: 2, left: 2, width: 19, height: 19, borderRadius: "50%",
+        background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.3)",
+        transition: "transform .22s cubic-bezier(.34,1.56,.64,1)",
+        transform: checked ? "translateX(15px)" : "translateX(0)",
+      }} />
+    </button>
   );
 }
 
 function WinBtn({ onClick, title, danger, children }: { onClick: () => void; title: string; danger?: boolean; children: React.ReactNode }) {
+  const [h, setH] = useState(false);
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`w-7 h-7 rounded flex items-center justify-center transition-colors duration-150 text-zinc-500 ${danger ? "hover:bg-red-500/80 hover:text-white" : "hover:bg-surface-3 hover:text-zinc-200"}`}
-    >
-      {children}
-    </button>
+    <button onClick={onClick} title={title} className="no-drag"
+      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{
+        width: 46, height: 40, border: "none", display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "default", transition: "background .12s",
+        color: danger && h ? "#fff" : "var(--text2)",
+        background: h ? (danger ? "#e81123" : "var(--winHover)") : "transparent",
+      }}>{children}</button>
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function NavItem({ active, label, onClick, icon }: { active: boolean; label: string; onClick: () => void; icon: React.ReactNode }) {
   return (
-    <button
-      onClick={onChange}
-      className={`no-drag relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${checked ? "bg-accent" : "bg-surface-3"}`}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
-        style={{ transform: checked ? "translateX(20px)" : "translateX(0)" }}
-      />
-    </button>
+    <button onClick={onClick} className="no-drag" style={{
+      display: "flex", alignItems: "center", gap: 11, width: "100%", padding: "8px 11px",
+      border: "none", borderRadius: 7, font: "inherit", fontSize: 13, fontWeight: 500,
+      cursor: "pointer", textAlign: "left", transition: "all .16s",
+      background: active ? ACCENT : "transparent",
+      color: active ? "#fff" : "var(--text)",
+      boxShadow: active ? "0 1px 2px rgba(0,0,0,.16)" : "none",
+    }}>{icon}<span>{label}</span></button>
   );
 }
 
-function DpadViz({ buttons }: { buttons: number }) {
-  const n = pressed(buttons, BTN.DPAD_N);
-  const e = pressed(buttons, BTN.DPAD_E);
-  const s = pressed(buttons, BTN.DPAD_S);
-  const w = pressed(buttons, BTN.DPAD_W);
-  const cls = (on: boolean) =>
-    `w-5 h-5 rounded-sm flex items-center justify-center text-[9px] transition-colors duration-75 ${on ? "bg-accent text-white" : "bg-surface-2 text-zinc-600"}`;
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className={cls(n)}>↑</div>
-      <div className="flex gap-0.5">
-        <div className={cls(w)}>←</div>
-        <div className="w-5 h-5 bg-surface-1 rounded-sm" />
-        <div className={cls(e)}>→</div>
-      </div>
-      <div className={cls(s)}>↓</div>
-      <span className="text-[10px] text-zinc-500 mt-1 font-medium tracking-widest uppercase">D-Pad</span>
-    </div>
-  );
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <div style={{ background: "var(--field)", border: "1px solid var(--border)", borderRadius: 12, ...style }}>{children}</div>;
 }
 
-function Battery({ level, charging, connected }: { level: number; charging: boolean; connected: boolean }) {
-  const color = level > 50 ? "#1bc49b" : level > 20 ? "#f59e0b" : "#ef4444";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="relative flex items-center">
-        <div className="w-9 h-5 rounded border-2 border-zinc-600 bg-surface-2 overflow-hidden flex flex-row">
-          <div
-            className="h-full transition-all duration-300"
-            style={{ width: `${connected ? level : 0}%`, background: color }}
-          />
-        </div>
-        <div className="w-1 h-2.5 bg-zinc-600 rounded-r ml-0.5 flex-shrink-0" />
-      </div>
-      <div className="flex flex-col">
-        <span className="text-sm font-semibold tabular-nums" style={{ color: connected ? color : "#3a3a50" }}>
-          {connected ? `${level}%` : "—"}
-        </span>
-        {connected && charging && (
-          <span className="text-[9px] text-amber-400 font-medium">Charging</span>
-        )}
-      </div>
-    </div>
-  );
-}
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--text3)" };
+const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 17px" };
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 
@@ -163,9 +199,9 @@ export default function App() {
   const [ctrl, setCtrl] = useState<Ds4State>(EMPTY);
   const [autostart, setAutostart] = useState(false);
   const [batteryColor, setBatteryColor] = useState(false);
-  const [vigem, setVigem] = useState<boolean | null>(null); // null = checking
+  const [vigem, setVigem] = useState<boolean | null>(null);
   const [vigemInstall, setVigemInstall] = useState<"idle" | "downloading" | "launched" | "error">("idle");
-  const [color, setColor] = useState("#0000ff");
+  const [color, setColor] = useState("#D42E86");
   const [audioFix, setAudioFix] = useState(false);
   const [audioStatus, setAudioStatus] = useState<"idle" | "working" | "done" | "error">("idle");
   const colorDebounce = useRef<ReturnType<typeof setTimeout>>();
@@ -177,6 +213,13 @@ export default function App() {
   const deadzoneDebounce = useRef<ReturnType<typeof setTimeout>>();
   const [touchpadMouse, setTouchpadMouse] = useState(false);
 
+  // UI-only state
+  const [tab, setTab] = useState<"monitor" | "lightbar" | "system">("monitor");
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("ds4-theme") as Theme) || "light");
+  const [pairing, setPairing] = useState(false);
+
+  useEffect(() => { localStorage.setItem("ds4-theme", theme); }, [theme]);
+
   useEffect(() => {
     invoke<boolean>("get_vigem_status").then(setVigem);
     invoke<boolean>("get_autostart").then(setAutostart);
@@ -184,8 +227,8 @@ export default function App() {
     invoke<number>("get_deadzone").then(v => setDeadzone(Math.round(v * 100)));
     invoke<boolean>("get_audio_fix").then(setAudioFix);
     invoke<boolean>("get_touchpad_mouse").then(setTouchpadMouse);
-    invoke<[number, number, number]>("get_lightbar").then(([r, g, b]) => {
-      setColor("#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join(""));
+    invoke<[number, number, number]>("get_lightbar").then(([r, g, bl]) => {
+      setColor("#" + [r, g, bl].map(v => v.toString(16).padStart(2, "0")).join(""));
     });
     const unlisten = listen<Ds4State>("controller-update", (e) => setCtrl(e.payload));
     const unlistenVigem = listen<string>("vigem-install", (e) => {
@@ -193,34 +236,23 @@ export default function App() {
       if (e.payload === "launched") setVigemInstall("launched");
     });
     invoke<Ds4State>("get_controller_state").then(setCtrl);
-    check().then(u => {
-      if (u?.available) { pendingUpdate.current = u; setUpdateVersion(u.version); }
-    }).catch(() => {});
-    return () => {
-      unlisten.then((fn) => fn());
-      unlistenVigem.then((fn) => fn());
-    };
+    check().then(u => { if (u?.available) { pendingUpdate.current = u; setUpdateVersion(u.version); } }).catch(() => {});
+    return () => { unlisten.then((fn) => fn()); unlistenVigem.then((fn) => fn()); };
   }, []);
+
+  useEffect(() => { if (ctrl.connected && pairing) setPairing(false); }, [ctrl.connected, pairing]);
 
   const installVigem = useCallback(async () => {
     setVigemInstall("downloading");
-    try {
-      await invoke("install_vigem_driver");
-    } catch {
-      setVigemInstall("error");
-    }
+    try { await invoke("install_vigem_driver"); } catch { setVigemInstall("error"); }
   }, []);
 
   const toggleAutostart = useCallback(async () => {
-    const next = !autostart;
-    await invoke("set_autostart", { enable: next });
-    setAutostart(next);
+    const next = !autostart; await invoke("set_autostart", { enable: next }); setAutostart(next);
   }, [autostart]);
 
   const toggleBatteryColor = useCallback(async () => {
-    const next = !batteryColor;
-    await invoke("set_battery_color", { enable: next });
-    setBatteryColor(next);
+    const next = !batteryColor; await invoke("set_battery_color", { enable: next }); setBatteryColor(next);
   }, [batteryColor]);
 
   const refreshVigemStatus = useCallback(() => {
@@ -231,371 +263,305 @@ export default function App() {
     setColor(hex);
     clearTimeout(colorDebounce.current);
     colorDebounce.current = setTimeout(() => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      invoke("set_lightbar", { r, g, b });
+      const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), bl = parseInt(hex.slice(5, 7), 16);
+      invoke("set_lightbar", { r, g, b: bl });
     }, 80);
   }, []);
 
   const toggleAudioFix = useCallback(async () => {
-    const next = !audioFix;
-    setAudioStatus("working");
+    const next = !audioFix; setAudioStatus("working");
     try {
       await invoke("set_audio_fix", { enable: next });
-      setAudioFix(next);
-      setAudioStatus("done");
-      setTimeout(() => setAudioStatus("idle"), 2000);
-    } catch {
-      setAudioStatus("error");
-      setTimeout(() => setAudioStatus("idle"), 3000);
-    }
+      setAudioFix(next); setAudioStatus("done"); setTimeout(() => setAudioStatus("idle"), 2000);
+    } catch { setAudioStatus("error"); setTimeout(() => setAudioStatus("idle"), 3000); }
   }, [audioFix]);
 
   const toggleTouchpadMouse = useCallback(async () => {
-    const next = !touchpadMouse;
-    await invoke("set_touchpad_mouse", { enable: next });
-    setTouchpadMouse(next);
+    const next = !touchpadMouse; await invoke("set_touchpad_mouse", { enable: next }); setTouchpadMouse(next);
   }, [touchpadMouse]);
 
   const doUpdate = useCallback(async () => {
     if (!pendingUpdate.current) return;
-    setUpdating(true);
-    setUpdateError(null);
-    try {
-      await pendingUpdate.current.downloadAndInstall();
-      await relaunch();
-    } catch (e) {
-      setUpdateError(String(e));
-      setUpdating(false);
-    }
+    setUpdating(true); setUpdateError(null);
+    try { await pendingUpdate.current.downloadAndInstall(); await relaunch(); }
+    catch (e) { setUpdateError(String(e)); setUpdating(false); }
   }, []);
 
-  const b = ctrl.buttons;
+  // ── Derived ──
+  const t = TOKENS[theme];
+  const dark = theme === "dark";
+  const conn = ctrl.connected;
+  const health = ctrl.battery > 50 ? "#2ca84e" : ctrl.battery > 20 ? "#e8920c" : "#e0392c";
+  const charging = conn && ctrl.charging;
+  const low = conn && !charging && ctrl.battery <= 20;
+  const battCol = !conn ? t.text3 : charging ? "#2ca84e" : health;
+  const effGlow = batteryColor ? (conn ? health : "#9a9aa2") : color;
+  const connText = ctrl.connection === "Bluetooth" ? "Bluetooth" : "USB";
+  const polling = ctrl.connection === "Bluetooth" ? "125 Hz" : "250 Hz";
+
+  let badgeText: string, badgeBg: string, badgeFg: string, dotColor: string, dotPulse: boolean;
+  if (conn && ctrl.connection === "Bluetooth") { badgeText = "Bluetooth"; badgeBg = dark ? "rgba(47,155,242,.2)" : "#e5f0ff"; badgeFg = dark ? "#5bb0ff" : "#0a6fd0"; dotColor = ACCENT; dotPulse = true; }
+  else if (conn) { badgeText = "USB"; badgeBg = dark ? "#34343c" : "#ececf0"; badgeFg = dark ? "#b8b8c2" : "#6e6e73"; dotColor = ACCENT; dotPulse = true; }
+  else if (pairing) { badgeText = "Pairing…"; badgeBg = dark ? "rgba(232,146,12,.2)" : "#fdf0dc"; badgeFg = "#e8920c"; dotColor = "#e8920c"; dotPulse = true; }
+  else { badgeText = "Offline"; badgeBg = dark ? "rgba(224,57,44,.16)" : "#f3e4e4"; badgeFg = dark ? "#e0857e" : "#b07070"; dotColor = t.text3; dotPulse = false; }
+
+  const vars = Object.fromEntries(Object.entries(t).map(([k, v]) => [`--${k}`, v])) as React.CSSProperties;
+
+  const SWATCHES: [string, string][] = [
+    ["#D42E86", "Magenta"], ["#0a84ff", "Blue"], ["#ff375f", "Red"],
+    ["#bf5af2", "Purple"], ["#ffd60a", "Yellow"], ["#ffffff", "White"],
+  ];
 
   return (
-    <div className="h-screen flex flex-col bg-surface overflow-hidden">
+    <div style={{
+      ...vars,
+      height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden",
+      background: "var(--surface)", color: "var(--text)",
+      fontFamily: "'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif",
+    }}>
       {/* Titlebar */}
-      <div className="flex items-center justify-between h-10 bg-surface-1 border-b border-surface-3 flex-shrink-0 select-none">
-        {/* Left: drag region — mousedown triggers native drag */}
-        <div
-          className="flex items-center gap-2.5 px-4 flex-1 h-full cursor-default select-none"
-          onMouseDown={(e) => { if (e.buttons === 1) invoke("start_dragging"); }}
-        >
-          <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${ctrl.connected ? "bg-green-400 animate-pulse_ring" : "bg-zinc-600"}`} />
-          <span className="text-sm font-semibold text-zinc-200">DS4 Bridge</span>
-          {ctrl.connected && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-zinc-400 font-medium">
-              {ctrl.connection === "Bluetooth" ? "BT" : "USB"}
-            </span>
-          )}
+      <div style={{ height: 40, flex: "none", display: "flex", alignItems: "stretch", borderBottom: "1px solid var(--border)", background: "var(--titlebar)" }}
+        onMouseDown={(e) => { if (e.buttons === 1) invoke("start_dragging"); }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, paddingLeft: 14 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, animation: dotPulse ? "ds4-conn 2s ease-in-out infinite" : "none" }} />
+          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-.01em" }}>DS4 Bridge</span>
+          <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 5, background: badgeBg, color: badgeFg }}>{badgeText}</span>
         </div>
-        {/* Right: battery + window controls — completely outside drag region */}
-        <div className="flex items-center gap-1 px-2 h-full flex-shrink-0">
-          <Battery level={ctrl.battery} charging={ctrl.charging} connected={ctrl.connected} />
-          <div className="flex items-center gap-0.5 ml-2">
-            <WinBtn title="Minimize" onClick={() => invoke("minimize_window")}>
-              <svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="8" x2="9" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            </WinBtn>
-            <WinBtn title="Maximize" onClick={() => invoke("toggle_maximize_window")}>
-              <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
-            </WinBtn>
-            <WinBtn title="Close to tray" onClick={() => invoke("hide_window")} danger>
-              <svg width="10" height="10" viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="8" y1="2" x2="2" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            </WinBtn>
+        <div style={{ flex: 1 }} />
+        <div className="no-drag" style={{ display: "flex", alignItems: "center", gap: 6, paddingRight: 10 }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div style={{ width: 26, height: 13, border: "1.5px solid var(--trackBorder)", borderRadius: 3, padding: 1.5, display: "flex", overflow: "hidden" }}>
+              <div style={{ width: conn ? `${ctrl.battery}%` : "0%", height: "100%", borderRadius: 1, background: charging ? "linear-gradient(90deg,#1f9d46 0%,#7fe3a4 50%,#1f9d46 100%)" : battCol, backgroundSize: "200% 100%", animation: charging ? "ds4-charge 1.2s linear infinite" : "none", transition: "width .3s" }} />
+            </div>
+            <div style={{ width: 2, height: 6, background: "var(--trackBorder)", borderRadius: "0 2px 2px 0", marginLeft: 1 }} />
           </div>
+          {charging && <svg width="9" height="13" viewBox="0 0 9 13" fill="#2ca84e"><path d="M5 0 0 7h3l-1 6 5-7H4z" /></svg>}
+          <span style={{ fontSize: 12, fontWeight: 600, color: battCol, minWidth: 30 }}>{conn ? `${ctrl.battery}%` : "—"}</span>
+        </div>
+        <div className="no-drag" style={{ display: "flex", alignItems: "stretch" }}>
+          <WinBtn title="Minimize" onClick={() => invoke("minimize_window")}>
+            <svg width="11" height="11" viewBox="0 0 11 11"><line x1="1.5" y1="6" x2="9.5" y2="6" stroke="currentColor" strokeWidth="1" /></svg>
+          </WinBtn>
+          <WinBtn title="Maximize" onClick={() => invoke("toggle_maximize_window")}>
+            <svg width="11" height="11" viewBox="0 0 11 11"><rect x="1.5" y="1.5" width="8" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1" /></svg>
+          </WinBtn>
+          <WinBtn title="Close to tray" onClick={() => invoke("hide_window")} danger>
+            <svg width="11" height="11" viewBox="0 0 11 11"><line x1="1.7" y1="1.7" x2="9.3" y2="9.3" stroke="currentColor" strokeWidth="1" /><line x1="9.3" y1="1.7" x2="1.7" y2="9.3" stroke="currentColor" strokeWidth="1" /></svg>
+          </WinBtn>
         </div>
       </div>
 
       {/* Update banner */}
       {updateVersion && (
-        <div className="flex flex-col px-4 py-1.5 bg-accent/15 border-b border-accent/25 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-zinc-300">
-              Update available — <span className="text-accent font-semibold">v{updateVersion}</span>
-            </span>
-            <button
-              onClick={doUpdate}
-              disabled={updating}
-              className="no-drag text-xs px-3 py-1 rounded-lg bg-accent hover:bg-accent-dim text-white font-semibold transition-colors disabled:opacity-60"
-            >
-              {updating ? "Downloading…" : "Update & Restart"}
-            </button>
+        <div style={{ flex: "none", padding: "8px 18px", background: "var(--accentSoft)", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12.5 }}>Update available — <span style={{ color: ACCENT, fontWeight: 600 }}>v{updateVersion}</span></span>
+            <button onClick={doUpdate} disabled={updating} className="no-drag" style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, border: "none", background: ACCENT, color: "#fff", fontWeight: 600, cursor: "pointer", opacity: updating ? .6 : 1 }}>{updating ? "Downloading…" : "Update & Restart"}</button>
           </div>
-          {updateError && (
-            <span className="text-[10px] text-red-400 mt-0.5">Error: {updateError}</span>
-          )}
+          {updateError && <span style={{ fontSize: 10, color: "#e0392c" }}>Error: {updateError}</span>}
         </div>
       )}
 
-      {/* ViGEmBus first-run setup wizard */}
+      {/* Low-battery banner */}
+      {low && (
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "9px 18px", background: dark ? "#3a1d1d" : "#fdecec", borderBottom: `1px solid ${dark ? "#582a2a" : "#f6d6d6"}` }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={dark ? "#ff9a92" : "#b4302a"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 1 21h22L12 2z" /><line x1="12" y1="9" x2="12" y2="14" /><circle cx="12" cy="17.5" r=".6" fill={dark ? "#ff9a92" : "#b4302a"} /></svg>
+          <span style={{ fontSize: 12.5, fontWeight: 500, color: dark ? "#ff9a92" : "#b4302a" }}>Controller battery low — {ctrl.battery}%. Plug in a USB cable to keep playing.</span>
+        </div>
+      )}
+
+      {/* ViGEmBus first-run setup */}
       {vigem === false && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-surface/90 backdrop-blur-sm animate-slide_up">
-          <div className="bg-surface-1 border border-surface-3 rounded-2xl p-8 max-w-sm w-full mx-4 flex flex-col gap-5 shadow-2xl">
+        <div style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--overlay)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
+          <div style={{ width: 380, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 30, boxShadow: "0 24px 60px -12px rgba(20,26,40,.4)", display: "flex", flexDirection: "column", gap: 18 }}>
             {vigemInstall === "launched" ? (
               <>
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-2xl">✓</div>
-                  <h2 className="text-lg font-semibold text-zinc-100">Installer launched!</h2>
-                  <p className="text-sm text-zinc-400">
-                    Finish the ViGEmBus installation, then click the button below.
-                  </p>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 13, textAlign: "center" }}>
+                  <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--accentSoft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>Installer launched</div>
+                  <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.55 }}>Finish the ViGEmBus installation in the window that just opened, then come back here.</div>
                 </div>
-                <button
-                  onClick={refreshVigemStatus}
-                  className="no-drag w-full py-2.5 rounded-xl bg-accent hover:bg-accent-dim text-white text-sm font-semibold transition-colors"
-                >
-                  I'm done installing →
-                </button>
+                <button onClick={refreshVigemStatus} className="no-drag" style={{ width: "100%", padding: 11, border: "none", borderRadius: 11, background: ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>I'm done installing →</button>
               </>
             ) : (
               <>
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 13, textAlign: "center" }}>
+                  <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--accentSoft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="15" /><polyline points="7 10.5 12 15.5 17 10.5" /><line x1="4.5" y1="20" x2="19.5" y2="20" /></svg>
                   </div>
-                  <h2 className="text-lg font-semibold text-zinc-100">One-time driver needed</h2>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    DS4 Bridge needs <strong className="text-zinc-300">ViGEmBus</strong> to pretend to be an Xbox controller.
-                    It's a small, trusted driver — takes about 30 seconds.
-                  </p>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>One-time driver needed</div>
+                  <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.55 }}>DS4 Bridge uses <strong style={{ color: "var(--text)" }}>ViGEmBus</strong> to make your PS4 pad look like an Xbox controller. It's a small, trusted driver — about 30 seconds.</div>
                 </div>
-
-                <div className="bg-surface-2 rounded-xl p-3 text-xs text-zinc-400 space-y-1.5">
-                  <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Free & open source by Nefarius Software</div>
-                  <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Used by DS4Windows, ReWASD, and others</div>
-                  <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Install once, works forever</div>
+                <div style={{ background: "var(--checklist)", borderRadius: 12, padding: "13px 15px", display: "flex", flexDirection: "column", gap: 9 }}>
+                  {["Free & open source by Nefarius Software", "Used by DS4Windows, reWASD and others", "Install once, works forever"].map((line) => (
+                    <div key={line} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, color: "var(--text2)" }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }}><polyline points="2 7.5 5.5 11 12 3.5" /></svg>{line}
+                    </div>
+                  ))}
                 </div>
-
                 {vigemInstall === "error" && (
-                  <p className="text-xs text-red-400 text-center">
-                    Download failed. Check your internet connection or{" "}
-                    <button onClick={() => invoke("open_vigem_download")} className="underline hover:text-red-300">install manually</button>.
-                  </p>
+                  <p style={{ fontSize: 12, color: "#e0392c", textAlign: "center", margin: 0 }}>Download failed. Check your connection or <button onClick={() => invoke("open_vigem_download")} className="no-drag" style={{ textDecoration: "underline", background: "none", border: "none", color: "#e0392c", cursor: "pointer" }}>install manually</button>.</p>
                 )}
-
-                <button
-                  onClick={installVigem}
-                  disabled={vigemInstall === "downloading"}
-                  className="no-drag w-full py-2.5 rounded-xl bg-accent hover:bg-accent-dim disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  {vigemInstall === "downloading" ? (
-                    <>
-                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                      </svg>
-                      Downloading…
-                    </>
-                  ) : "Install Driver (Free)"}
+                <button onClick={installVigem} disabled={vigemInstall === "downloading"} className="no-drag" style={{ width: "100%", padding: 11, border: "none", borderRadius: 11, background: vigemInstall === "downloading" ? "#e6a9c9" : ACCENT, color: "#fff", fontSize: 13.5, fontWeight: 600, cursor: vigemInstall === "downloading" ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}>
+                  {vigemInstall === "downloading" ? (<><span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(255,255,255,.45)", borderTopColor: "#fff", animation: "ds4-spin .7s linear infinite", display: "inline-block" }} />Downloading…</>) : "Install Driver (Free)"}
                 </button>
-                <button
-                  onClick={() => invoke("open_vigem_download")}
-                  className="no-drag text-xs text-zinc-500 hover:text-zinc-300 text-center transition-colors"
-                >
-                  Install manually instead
-                </button>
+                <button onClick={() => invoke("open_vigem_download")} className="no-drag" style={{ fontSize: 12, color: "var(--text2)", background: "none", border: "none", cursor: "pointer" }}>Install manually instead</button>
               </>
             )}
           </div>
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left panel — controller monitor */}
-        <div className="flex-1 p-5 flex flex-col gap-5 overflow-y-auto">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Controller Monitor</h2>
+      {/* Body */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        {/* Sidebar */}
+        <div style={{ width: 206, flex: "none", background: "var(--sidebar)", borderRight: "1px solid var(--border)", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase" as const, color: "var(--text3)", padding: "0 8px", marginBottom: 7 }}>Controller</div>
+          <NavItem active={tab === "monitor"} label="Monitor" onClick={() => setTab("monitor")} icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }}><polyline points="1 8 5 8 7 3.5 10 12.5 12 8 15 8" /></svg>} />
+          <NavItem active={tab === "lightbar"} label="Lightbar" onClick={() => setTab("lightbar")} icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ flex: "none" }}><circle cx="8" cy="8" r="3.1" /><line x1="8" y1="1.5" x2="8" y2="3" /><line x1="8" y1="13" x2="8" y2="14.5" /><line x1="1.5" y1="8" x2="3" y2="8" /><line x1="13" y1="8" x2="14.5" y2="8" /><line x1="3.4" y1="3.4" x2="4.4" y2="4.4" /><line x1="11.6" y1="11.6" x2="12.6" y2="12.6" /><line x1="3.4" y1="12.6" x2="4.4" y2="11.6" /><line x1="11.6" y1="4.4" x2="12.6" y2="3.4" /></svg>} />
+          <NavItem active={tab === "system"} label="System" onClick={() => setTab("system")} icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ flex: "none" }}><line x1="2.5" y1="5.5" x2="13.5" y2="5.5" /><circle cx="10" cy="5.5" r="1.7" fill="var(--sidebar)" /><line x1="2.5" y1="10.5" x2="13.5" y2="10.5" /><circle cx="6" cy="10.5" r="1.7" fill="var(--sidebar)" /></svg>} />
+          <div style={{ flex: 1 }} />
+          <div style={{ padding: "0 8px", fontSize: 11, color: "var(--text4)", lineHeight: 1.5 }}>ViGEmBus {vigem ? "active" : vigem === false ? "missing" : "…"}</div>
+        </div>
 
-          {!ctrl.connected ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-zinc-600">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 11h4m2 0h4M8 7v4M3 7h18l-2 12H5L3 7z" />
-                <circle cx="16" cy="11" r="0.5" fill="currentColor" />
-                <circle cx="18" cy="9" r="0.5" fill="currentColor" />
-              </svg>
-              <span className="text-sm">No controller detected</span>
-              <span className="text-xs">Connect your PS4 controller via USB or Bluetooth</span>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-5 animate-slide_up">
-              {/* Face buttons row */}
-              <div className="flex items-center justify-between bg-surface-1 rounded-xl p-4 border border-surface-3">
-                <DpadViz buttons={b} />
-
-                <div className="flex gap-2 flex-col items-center">
-                  <div className="flex gap-2">
-                    <BtnDot active={pressed(b, BTN.L1)} color="#6c63ff" label="L1" />
-                    <BtnDot active={pressed(b, BTN.L2_BTN)} color="#6c63ff" label="L2" />
-                    <BtnDot active={pressed(b, BTN.L3)} color="#6c63ff" label="L3" />
-                  </div>
-                  <div className="flex gap-2">
-                    <BtnDot active={pressed(b, BTN.SHARE)} color="#94a3b8" label="SH" />
-                    <BtnDot active={pressed(b, BTN.PS)} color="#6c63ff" label="PS" />
-                    <BtnDot active={pressed(b, BTN.OPTIONS)} color="#94a3b8" label="OP" />
-                  </div>
-                  <BtnDot active={pressed(b, BTN.TOUCHPAD)} color="#64748b" label="TP" />
-                </div>
-
-                <div className="flex flex-col items-center gap-2">
-                  <div className="flex gap-2">
-                    <BtnDot active={pressed(b, BTN.R1)} color="#6c63ff" label="R1" />
-                    <BtnDot active={pressed(b, BTN.R2_BTN)} color="#6c63ff" label="R2" />
-                    <BtnDot active={pressed(b, BTN.R3)} color="#6c63ff" label="R3" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1.5">
-                    <BtnDot active={pressed(b, BTN.TRIANGLE)} color="#1bc49b" label="△" />
-                    <div className="flex gap-2">
-                      <BtnDot active={pressed(b, BTN.SQUARE)} color="#dc84f3" label="□" />
-                      <BtnDot active={pressed(b, BTN.CIRCLE)} color="#e84393" label="○" />
-                    </div>
-                    <BtnDot active={pressed(b, BTN.CROSS)} color="#5bc8f5" label="✕" />
-                  </div>
-                </div>
+        {/* Content */}
+        <div style={{ flex: 1, minWidth: 0, background: "var(--surface)", padding: "26px 28px", overflow: "auto" }}>
+          {tab === "monitor" && conn && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div>
+                <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: "-.015em" }}>Live Input</div>
+                <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 3 }}>Real-time view of every stick, trigger, and button.</div>
               </div>
-
-              {/* Sticks + triggers */}
-              <div className="flex items-center justify-around bg-surface-1 rounded-xl p-4 border border-surface-3">
-                <TriggerBar value={ctrl.l2} label="L2" />
-                <StickViz x={ctrl.lx} y={ctrl.ly} label="L Stick" />
-                <StickViz x={ctrl.rx} y={ctrl.ry} label="R Stick" />
-                <TriggerBar value={ctrl.r2} label="R2" />
+              <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 14, padding: 26, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                <Pad ctrl={ctrl} glow={effGlow} />
+              </div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <Card style={{ flex: 1, padding: "13px 15px" }}>
+                  <div style={lbl}>Battery</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                    <span style={{ fontSize: 18, fontWeight: 600, color: battCol }}>{ctrl.battery}%</span>
+                    {charging && <svg width="9" height="13" viewBox="0 0 9 13" fill="#2ca84e"><path d="M5 0 0 7h3l-1 6 5-7H4z" /></svg>}
+                  </div>
+                  {charging && <div style={{ fontSize: 11, fontWeight: 600, color: "#2ca84e", marginTop: 2 }}>Charging</div>}
+                </Card>
+                <Card style={{ flex: 1, padding: "13px 15px" }}><div style={lbl}>Connection</div><div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{connText}</div></Card>
+                <Card style={{ flex: 1, padding: "13px 15px" }}><div style={lbl}>Polling</div><div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{polling}</div></Card>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Right panel — settings */}
-        <div className="w-60 border-l border-surface-3 bg-surface-1 flex flex-col gap-1 p-4 overflow-y-auto flex-shrink-0">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-2">Settings</h2>
-
-          {/* Lightbar */}
-          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-300">Lightbar</span>
-              <div
-                className="w-5 h-5 rounded-full border-2 border-surface-3 transition-colors duration-300"
-                style={{ background: batteryColor
-                  ? (ctrl.battery > 50 ? "#00cc44" : ctrl.battery > 20 ? "#f59e0b" : "#ef4444")
-                  : color }}
-              />
-            </div>
-
-            {/* Battery color mode toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-medium text-zinc-400">Battery indicator</span>
-                <p className="text-[10px] text-zinc-600">Auto: green → amber → red</p>
-              </div>
-              <Toggle checked={batteryColor} onChange={toggleBatteryColor} />
-            </div>
-
-            {/* Manual picker — dimmed when battery color mode is on */}
-            <div className={`flex flex-col gap-2 transition-opacity duration-200 ${batteryColor ? "opacity-30 pointer-events-none" : ""}`}>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => onColorChange(e.target.value)}
-                disabled={!ctrl.connected || batteryColor}
-                className="no-drag w-full h-8 cursor-pointer rounded-lg border border-surface-3 bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
-              />
-              <div className="flex gap-1.5 flex-wrap">
-                {[
-                  ["#0000ff", "Blue"], ["#ff0000", "Red"], ["#00ff00", "Green"],
-                  ["#ff00ff", "Pink"], ["#ffffff", "White"], ["#000000", "Off"],
-                ].map(([hex, name]) => (
-                  <button
-                    key={hex}
-                    title={name}
-                    onClick={() => onColorChange(hex)}
-                    disabled={!ctrl.connected || batteryColor}
-                    className="no-drag w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{ background: hex === "#000000" ? "#1c1c26" : hex, borderColor: color === hex ? "#ffffff" : "#2a2a38" }}
-                  />
+          {tab === "monitor" && !conn && pairing && (
+            <div style={{ height: "100%", minHeight: 420, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, textAlign: "center" }}>
+              <div style={{ position: "relative", width: 128, height: 128, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+                {[0, 0.8, 1.6].map((d) => (
+                  <div key={d} style={{ position: "absolute", width: 118, height: 118, borderRadius: "50%", border: "1.5px solid #2f9bf2", animation: `ds4-scan 2.4s ease-out ${d}s infinite` }} />
                 ))}
+                <div style={{ width: 62, height: 62, borderRadius: "50%", background: "#2f9bf2", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(47,155,242,.45)" }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 7.5 17 16l-5 4V4l5 4L6.5 16.5" /></svg>
+                </div>
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 600 }}>Pairing over Bluetooth…</div>
+              <div style={{ fontSize: 13, color: "var(--text2)", maxWidth: 300, lineHeight: 1.5 }}>Hold <strong style={{ color: "var(--text)" }}>Share</strong> + <strong style={{ color: "var(--text)" }}>PS</strong> on your DualShock 4 until the lightbar flashes white.</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, padding: "7px 13px", border: "1px solid var(--border)", borderRadius: 999, background: "var(--chip)" }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#2f9bf2", animation: "ds4-pulse 1.2s ease-in-out infinite" }} />
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text2)" }}>Searching for controllers…</span>
+              </div>
+              <button onClick={() => setPairing(false)} className="no-drag" style={{ marginTop: 6, fontSize: 12, fontWeight: 500, color: "var(--text3)", background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
+            </div>
+          )}
+
+          {tab === "monitor" && !conn && !pairing && (
+            <div style={{ height: "100%", minHeight: 420, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 7, textAlign: "center" }}>
+              <div style={{ position: "relative", width: 172, height: 104, opacity: .55, marginBottom: 8 }}>
+                <div style={{ position: "absolute", left: 2, top: 30, width: 38, height: 72, borderRadius: 19, transform: "rotate(-15deg)", border: "2px solid var(--ghost)" }} />
+                <div style={{ position: "absolute", right: 2, top: 30, width: 38, height: 72, borderRadius: 19, transform: "rotate(15deg)", border: "2px solid var(--ghost)" }} />
+                <div style={{ position: "absolute", left: 10, top: 22, width: 152, height: 56, borderRadius: 28, border: "2px solid var(--ghost)", background: "var(--surface)" }} />
+                <div style={{ position: "absolute", left: 33, top: 46, width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--ghost)" }} />
+                <div style={{ position: "absolute", left: 120, top: 46, width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--ghost)" }} />
+                <div style={{ position: "absolute", left: 66, top: 18, width: 40, height: 5, borderRadius: 3, background: "var(--ghost)" }} />
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 600 }}>No controller detected</div>
+              <div style={{ fontSize: 13, color: "var(--text2)", maxWidth: 280, lineHeight: 1.5 }}>Connect your PS4 DualShock 4 over USB or pair it via Bluetooth to start playing.</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 13px", border: "1px solid var(--border)", borderRadius: 999, background: "var(--chip)" }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--text3)" }} />
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text2)" }}>Waiting for connection…</span>
+                </div>
+                <button onClick={() => setPairing(true)} className="no-drag" style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 14px", border: "none", borderRadius: 999, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 7.5 17 16l-5 4V4l5 4L6.5 16.5" /></svg>Pair via Bluetooth
+                </button>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Launch on startup */}
-          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-300">Launch on startup</span>
-              <Toggle checked={autostart} onChange={toggleAutostart} />
+          {tab === "lightbar" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div>
+                <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: "-.015em" }}>Lightbar</div>
+                <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 3 }}>Set a fixed color or let it track the battery.</div>
+              </div>
+              <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 14, padding: 26, display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+                <div style={{ width: 260, height: 15, borderRadius: 8, background: effGlow, boxShadow: `0 0 30px ${effGlow}` }} />
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", opacity: batteryColor ? .35 : 1, pointerEvents: batteryColor ? "none" : "auto" }}>
+                  {SWATCHES.map(([hex, name]) => {
+                    const selected = color.toLowerCase() === hex.toLowerCase() && !batteryColor;
+                    return <button key={hex} title={name} onClick={() => onColorChange(hex)} disabled={!conn || batteryColor} className="no-drag" style={{ width: 32, height: 32, borderRadius: "50%", cursor: "pointer", flex: "none", padding: 0, transition: "transform .15s", background: hex, border: `2px solid ${selected ? "var(--text)" : hex.toLowerCase() === "#ffffff" ? "var(--border)" : "transparent"}`, boxShadow: selected ? "0 0 0 2px var(--surface) inset" : "none" }} />;
+                  })}
+                </div>
+              </div>
+              <Card style={{ padding: "15px 17px", display: "flex", alignItems: "center", justifyContent: "space-between", opacity: batteryColor ? .4 : 1 }}>
+                <div><div style={{ fontSize: 14, fontWeight: 500 }}>Custom color</div><div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>{color}</div></div>
+                <input type="color" value={color} onChange={(e) => onColorChange(e.target.value)} disabled={!conn || batteryColor} className="no-drag" style={{ width: 46, height: 32, borderRadius: 9, border: "none", background: "none", cursor: "pointer" }} />
+              </Card>
+              <Card style={{ padding: "15px 17px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div><div style={{ fontSize: 14, fontWeight: 500 }}>Battery indicator</div><div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Auto: green → amber → red</div></div>
+                <Toggle checked={batteryColor} onChange={toggleBatteryColor} />
+              </Card>
+              {!conn && <div style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 7 }}><div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--text3)" }} />Connect a controller to apply lightbar changes.</div>}
             </div>
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
-              Start DS4 Bridge silently with Windows. It'll sit in the tray until you open it.
-            </p>
-          </div>
+          )}
 
-          {/* Audio fix */}
-          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-300">Audio Fix</span>
-              <Toggle checked={audioFix} onChange={toggleAudioFix} />
+          {tab === "system" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div>
+                <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: "-.015em" }}>System</div>
+                <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 3 }}>Emulation, startup, and input behavior.</div>
+              </div>
+              <Card style={{ overflow: "hidden" }}>
+                <div style={rowStyle}><div><div style={{ fontSize: 14, fontWeight: 500 }}>Launch on startup</div><div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Start silently with Windows</div></div><Toggle checked={autostart} onChange={toggleAutostart} /></div>
+                <div style={{ ...rowStyle, borderTop: "1px solid var(--divider)" }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>Audio Fix</div>
+                    <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Disable the phantom DS4 mic &amp; speaker</div>
+                    {audioStatus === "working" && <span style={{ fontSize: 11, color: "#e8920c" }}>Applying…</span>}
+                    {audioStatus === "done" && <span style={{ fontSize: 11, color: "#2ca84e" }}>Done</span>}
+                    {audioStatus === "error" && <span style={{ fontSize: 11, color: "#e0392c" }}>Failed — try as Admin</span>}
+                  </div>
+                  <Toggle checked={audioFix} onChange={toggleAudioFix} />
+                </div>
+                <div style={{ ...rowStyle, borderTop: "1px solid var(--divider)" }}><div><div style={{ fontSize: 14, fontWeight: 500 }}>Touchpad Mouse</div><div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Swipe to move the cursor, press to click</div></div><Toggle checked={touchpadMouse} onChange={toggleTouchpadMouse} /></div>
+              </Card>
+              <Card style={{ padding: 17 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 13 }}><span style={{ fontSize: 14, fontWeight: 500 }}>Stick Deadzone</span><span style={{ fontSize: 13, fontWeight: 600, color: ACCENT }}>{deadzone}%</span></div>
+                <input type="range" min={0} max={40} value={deadzone} onChange={(e) => { const v = Number(e.target.value); setDeadzone(v); clearTimeout(deadzoneDebounce.current); deadzoneDebounce.current = setTimeout(() => invoke("set_deadzone", { value: v / 100 }), 80); }} className="no-drag grn" style={{ width: "100%" }} />
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 10 }}>Ignore stick input below this threshold. Helps with drift.</div>
+              </Card>
+              <Card style={{ padding: "15px 17px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div><div style={{ fontSize: 14, fontWeight: 500 }}>XInput Emulation</div><div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Appears to games as an Xbox 360 pad</div></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: vigem && conn ? ACCENT : vigem ? "#e8920c" : "var(--text3)" }} /><span style={{ fontSize: 13, fontWeight: 500, color: vigem && conn ? ACCENT : "var(--text3)" }}>{vigem && conn ? "Active" : vigem ? "Standby" : "Not installed"}</span></div>
+              </Card>
+              <Card style={{ padding: "15px 17px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div><div style={{ fontSize: 14, fontWeight: 500 }}>Appearance</div><div style={{ fontSize: 12, color: "var(--text2)", marginTop: 1 }}>Light or dark window theme</div></div>
+                <div style={{ display: "flex", background: "var(--toggleOff)", borderRadius: 8, padding: 2, gap: 2 }}>
+                  {(["light", "dark"] as Theme[]).map((th) => (
+                    <button key={th} onClick={() => setTheme(th)} className="no-drag" style={{ padding: "5px 12px", border: "none", borderRadius: 6, font: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", textTransform: "capitalize", background: theme === th ? ACCENT : "transparent", color: theme === th ? "#fff" : "var(--text2)" }}>{th}</button>
+                  ))}
+                </div>
+              </Card>
             </div>
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
-              Disables the microphone &amp; speaker Windows creates when the DS4 connects.
-            </p>
-            {audioStatus === "working" && <span className="text-[11px] text-amber-400">Applying…</span>}
-            {audioStatus === "done" && <span className="text-[11px] text-green-400">Done</span>}
-            {audioStatus === "error" && <span className="text-[11px] text-red-400">Failed — try as Admin</span>}
-          </div>
-
-          {/* XInput status */}
-          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex items-center justify-between">
-            <div>
-              <span className="text-sm font-medium text-zinc-300">XInput</span>
-              <p className="text-[11px] text-zinc-500 mt-0.5">ViGEmBus emulation</p>
-            </div>
-            <div className={`w-2 h-2 rounded-full ${
-              vigem === null ? "bg-zinc-500" :
-              vigem && ctrl.connected ? "bg-green-400" :
-              vigem ? "bg-amber-400" : "bg-red-500"
-            }`} />
-          </div>
-
-          {/* Stick deadzone */}
-          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-300">Stick Deadzone</span>
-              <span className="text-xs font-semibold tabular-nums text-accent">{deadzone}%</span>
-            </div>
-            <input
-              type="range" min={0} max={40} value={deadzone}
-              onChange={e => {
-                const v = Number(e.target.value);
-                setDeadzone(v);
-                clearTimeout(deadzoneDebounce.current);
-                deadzoneDebounce.current = setTimeout(() => invoke("set_deadzone", { value: v / 100 }), 80);
-              }}
-              className="no-drag w-full accent-accent h-1.5 cursor-pointer"
-            />
-            <p className="text-[10px] text-zinc-600">Ignore stick input below this threshold. Helps with drift.</p>
-          </div>
-
-          {/* Touchpad as mouse */}
-          <div className="bg-surface-2 rounded-xl p-3.5 border border-surface-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-300">Touchpad Mouse</span>
-              <Toggle checked={touchpadMouse} onChange={toggleTouchpadMouse} />
-            </div>
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
-              Swipe the touchpad to move the cursor. Press it to left-click.
-            </p>
-          </div>
-
-          {/* Info */}
-          <div className="mt-auto pt-2 text-[10px] text-zinc-600 leading-relaxed">
-            {ctrl.connected ? (
-              <>
-                <div>Connection: {ctrl.connection}</div>
-                <div>Battery: {ctrl.battery}%{ctrl.charging ? " ⚡" : ""}</div>
-              </>
-            ) : (
-              <div>No controller connected</div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

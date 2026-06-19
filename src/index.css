@@ -4,21 +4,52 @@
 
 @layer base {
   * { box-sizing: border-box; }
+  html, body, #root { height: 100%; margin: 0; padding: 0; }
   body {
-    background-color: #0f0f13;
-    color: #e8e8f0;
-    font-family: "Inter", system-ui, sans-serif;
+    color: #1d1d1f;
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
   }
-  /* Thin custom scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
+  /* Thin themable scrollbar */
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a38; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: var(--toggleOff, #e3e3e8); border-radius: 4px; }
 }
 
 @layer utilities {
   .drag { -webkit-app-region: drag; user-select: none; }
   .no-drag { -webkit-app-region: no-drag; pointer-events: auto; user-select: auto; }
 }
+
+/* Magenta range slider, themable track */
+input[type="range"].grn {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--toggleOff, #e3e3e8);
+  outline: none;
+  accent-color: #D42E86;
+}
+input[type="range"].grn::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; }
+input[type="range"].grn::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px; margin-top: -7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .28);
+  border: .5px solid rgba(0, 0, 0, .05);
+  cursor: pointer;
+}
+
+input[type="color"] { -webkit-appearance: none; appearance: none; padding: 0; }
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(0, 0, 0, .1); border-radius: 9px; }
+
+@keyframes ds4-conn { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+@keyframes ds4-spin { to { transform: rotate(360deg); } }
+@keyframes ds4-charge { 0% { background-position: 0% 0; } 100% { background-position: -200% 0; } }
+@keyframes ds4-scan { 0% { transform: scale(.35); opacity: .5; } 100% { transform: scale(1.75); opacity: 0; } }
+@keyframes ds4-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
